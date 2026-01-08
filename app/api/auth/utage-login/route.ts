@@ -241,11 +241,13 @@ export async function POST(request: NextRequest) {
       // メモリリークを防ぐため、古いトークンハッシュを定期的にクリア
       if (usedTokens.size > 1000) {
         const tokenMaxAge = 24 * 60 * 60 * 1000; // 24時間
-        for (const [hash, timestamp] of usedTokens.entries()) {
+        const tokensToDelete: string[] = [];
+        usedTokens.forEach((timestamp, hash) => {
           if (now - timestamp > tokenMaxAge) {
-            usedTokens.delete(hash);
+            tokensToDelete.push(hash);
           }
-        }
+        });
+        tokensToDelete.forEach(hash => usedTokens.delete(hash));
       }
     } catch (error) {
       const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEV_MODE === 'true';
