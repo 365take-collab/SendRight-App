@@ -98,7 +98,7 @@ function UtageLoginContent() {
             <p className="text-sm text-gray-400 mt-2">{errorMessage}</p>
             <div className="mt-6">
               <a 
-                href={process.env.NEXT_PUBLIC_UTAGE_MEMBER_URL || 'https://utage-system.com/member'}
+                href={process.env.NEXT_PUBLIC_UTAGE_MEMBER_URL || 'https://utage-system.com/members/prUSVju86L5m/home'}
                 className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition"
               >
                 会員ページに戻る

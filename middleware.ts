@@ -7,7 +7,7 @@ import { verifyToken, findUserById, checkSubscription } from '@/lib/auth';
  */
 function getAccessDeniedHTML(message: string, showUtageOption: boolean = true, memberPageUrl?: string): string {
   // 会員ページURLを取得（環境変数から、またはデフォルト値）
-  const utageMemberUrl = memberPageUrl || process.env.UTAGE_MEMBER_URL || 'https://utage-system.com/member';
+  const utageMemberUrl = memberPageUrl || process.env.UTAGE_MEMBER_URL || 'https://utage-system.com/members/prUSVju86L5m/home';
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
