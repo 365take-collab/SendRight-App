@@ -402,12 +402,73 @@ export async function middleware(request: NextRequest) {
     });
   }
   
-  // 無料ユーザーは自由にアクセス可能（ログは記録しない）
-  if (!isPremiumUser) {
-    console.log('無料ユーザー: アクセス許可', {
-      pathname: request.nextUrl.pathname,
-      userPlan
-    });
+  // 認証が必要なページ（メインアプリ）
+  const protectedPaths = ['/', '/help', '/subscribe'];
+  const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
+  
+  // 保護されたページへのアクセスにはトークンが必要
+  if (isProtectedPath) {
+    const authToken = request.cookies.get('token')?.value;
+    
+    if (!authToken) {
+      // トークンがない場合は、Utage会員ページへリダイレクト
+      console.warn('認証なしでの保護ページへのアクセスを拒否:', {
+        pathname: request.nextUrl.pathname,
+        hasToken: false,
+      });
+      
+      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。会員ページからログインしてください。', true), {
+        status: 403,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+    
+    // トークンを検証
+    try {
+      const tokenData = verifyToken(authToken);
+      if (!tokenData) {
+        console.warn('無効なトークンでのアクセスを拒否:', {
+          pathname: request.nextUrl.pathname,
+        });
+        
+        // 無効なトークンを削除
+        response.cookies.delete('token');
+        response.cookies.delete('userId');
+        
+        return new NextResponse(getAccessDeniedHTML('セッションの有効期限が切れています。会員ページから再度ログインしてください。', true), {
+          status: 403,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
+      
+      // トークンが有効な場合、ユーザーのサブスクリプション状態を確認
+      const user = await findUserById(tokenData.userId);
+      if (!user || !checkSubscription(user)) {
+        console.warn('サブスクリプションが無効なユーザーのアクセスを拒否:', {
+          pathname: request.nextUrl.pathname,
+          userId: tokenData.userId,
+          hasUser: !!user,
+          isSubscribed: user?.isSubscribed,
+        });
+        
+        return new NextResponse(getAccessDeniedHTML('サブスクリプションが有効ではありません。会員ページでお支払い状況をご確認ください。', true), {
+          status: 403,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
+      
+      console.log('認証済みユーザー: アクセス許可', {
+        pathname: request.nextUrl.pathname,
+        userId: user.id,
+      });
+    } catch (error) {
+      console.error('トークン検証エラー:', error);
+      
+      return new NextResponse(getAccessDeniedHTML('認証エラーが発生しました。会員ページから再度ログインしてください。', true), {
+        status: 403,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
   }
 
   return response;
