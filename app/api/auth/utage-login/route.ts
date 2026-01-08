@@ -331,7 +331,7 @@ export async function POST(request: NextRequest) {
     });
 
     // セッションクッキーを設定（ログイン成功時）
-    const now = Date.now();
+    const currentTime = Date.now();
     response.cookies.set('utage_access', 'true', {
       maxAge: 24 * 60 * 60, // 1日
       httpOnly: true,
@@ -340,7 +340,7 @@ export async function POST(request: NextRequest) {
     });
     
     // セッションタイムスタンプを保存
-    response.cookies.set('utage_access_timestamp', now.toString(), {
+    response.cookies.set('utage_access_timestamp', currentTime.toString(), {
       maxAge: 24 * 60 * 60, // 1日
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
