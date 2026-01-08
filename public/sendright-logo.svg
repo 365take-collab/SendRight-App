@@ -1,0 +1,56 @@
+<svg width="220" height="50" viewBox="0 0 220 50" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- チャットバブルのグラデーション（左が明るい青、右が濃い青） -->
+    <linearGradient id="bubbleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Sendテキストのグラデーション（左が明るい青、右が濃い青） -->
+    <linearGradient id="sendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Rightテキストのグラデーション（青から紫へ） -->
+    <linearGradient id="rightGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 速度線（3本の横線、チャットバブルの左側に配置、上から下に短くなる）スピード感を表現 -->
+  <line x1="6" y1="18" x2="12" y2="18" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+  <line x1="6" y1="22" x2="15" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+  <line x1="6" y1="26" x2="10" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+  
+  <!-- チャットバブル（丸みを帯びた四角形に下向きの三角形の尾）- コミュニケーションを表現 -->
+  <path d="M 10 8 Q 10 4 14 4 L 30 4 Q 34 4 34 8 L 34 20 Q 34 24 30 24 L 22 24 L 18 32 L 18 24 L 14 24 Q 10 24 10 20 Z" 
+        fill="url(#bubbleGradient)" 
+        stroke="none"/>
+  
+  <!-- 紙飛行機（チャットバブルから出て右上に向かう）- スピードを表現 -->
+  <path d="M 22 18 L 32 10 L 30 24 Z" fill="white" stroke="none"/>
+  
+  <!-- 矢印の軌跡（スピード感を強調） -->
+  <path d="M 30 18 L 36 14" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  
+  <!-- SendRight テキスト（モダンなサンセリフ、プロフェッショナル） -->
+  <g transform="translate(48, 32)">
+    <!-- Send部分（青のグラデーション） -->
+    <text font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif" 
+          font-size="24" font-weight="600" 
+          letter-spacing="-0.02em">
+      <tspan fill="url(#sendGradient)" font-weight="700">S</tspan>
+      <tspan fill="url(#sendGradient)">end</tspan>
+    </text>
+    
+    <!-- Right部分（青から紫のグラデーション） -->
+    <text x="62" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif" 
+          font-size="24" font-weight="600" 
+          letter-spacing="-0.02em">
+      <tspan fill="url(#rightGradient)" font-weight="700">R</tspan>
+      <tspan fill="url(#rightGradient)">ight</tspan>
+    </text>
+  </g>
+</svg>
