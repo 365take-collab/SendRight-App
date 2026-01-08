@@ -1,10 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-export default function UtageLoginPage() {
+function UtageLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -113,5 +114,26 @@ export default function UtageLoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="max-w-md w-full space-y-8 p-8 bg-gray-900 rounded-2xl border border-gray-800">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
+          <p className="text-gray-300 text-lg">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function UtageLoginPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <UtageLoginContent />
+    </Suspense>
   );
 }
