@@ -258,38 +258,43 @@ export async function POST(request: NextRequest) {
                   // Stripeを使用している場合（UnivaPay経由でもStripe APIが使える場合）
                   const { stripe } = await import('@/lib/stripe');
                   
-                  // ユーザーのアクティブなサブスクリプションを取得
-                  const subscriptions = await stripe.subscriptions.list({
-                    customer: user.stripeCustomerId,
-                    status: 'active',
-                  });
-
-                  // 基本プラン（¥6,980/月）のサブスクリプションを検索
-                  // 月額プランの場合: ¥6,980 = 698000（Stripeは金額をセント単位で保存）
-                  // 年額プランの場合: ¥59,800 = 5980000
-                  const basicPlanSubscription = subscriptions.data.find((sub) => {
-                    const price = sub.items.data[0]?.price;
-                    if (!price) return false;
-                    
-                    // 月額¥6,980または年額¥59,800のサブスクリプションを検索
-                    const amount = price.unit_amount || 0;
-                    return amount === 698000 || amount === 5980000;
-                  });
-
-                  if (basicPlanSubscription) {
-                    // 基本プランのサブスクリプションを解除
-                    await stripe.subscriptions.cancel(basicPlanSubscription.id);
-                    console.log('Basic plan subscription cancelled (Stripe):', {
-                      email: userEmail,
-                      subscriptionId: basicPlanSubscription.id,
-                      newLimit,
-                    });
+                  // Stripeが設定されていない場合はスキップ
+                  if (!stripe) {
+                    console.log('Stripe is not configured, skipping subscription cancellation');
                   } else {
-                    console.log('Basic plan subscription not found (Stripe):', {
-                      email: userEmail,
-                      customerId: user.stripeCustomerId,
-                      activeSubscriptions: subscriptions.data.length,
+                    // ユーザーのアクティブなサブスクリプションを取得
+                    const subscriptions = await stripe.subscriptions.list({
+                      customer: user.stripeCustomerId,
+                      status: 'active',
                     });
+
+                    // 基本プラン（¥6,980/月）のサブスクリプションを検索
+                    // 月額プランの場合: ¥6,980 = 698000（Stripeは金額をセント単位で保存）
+                    // 年額プランの場合: ¥59,800 = 5980000
+                    const basicPlanSubscription = subscriptions.data.find((sub) => {
+                      const price = sub.items.data[0]?.price;
+                      if (!price) return false;
+                      
+                      // 月額¥6,980または年額¥59,800のサブスクリプションを検索
+                      const amount = price.unit_amount || 0;
+                      return amount === 698000 || amount === 5980000;
+                    });
+
+                    if (basicPlanSubscription) {
+                      // 基本プランのサブスクリプションを解除
+                      await stripe.subscriptions.cancel(basicPlanSubscription.id);
+                      console.log('Basic plan subscription cancelled (Stripe):', {
+                        email: userEmail,
+                        subscriptionId: basicPlanSubscription.id,
+                        newLimit,
+                      });
+                    } else {
+                      console.log('Basic plan subscription not found (Stripe):', {
+                        email: userEmail,
+                        customerId: user.stripeCustomerId,
+                        activeSubscriptions: subscriptions.data.length,
+                      });
+                    }
                   }
                 } else {
                   console.log('No payment provider information available:', {

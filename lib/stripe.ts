@@ -1,17 +1,30 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set');
-}
+// Stripeはオプション（Utageで決済する場合は不要）
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-12-15.clover',
-});
+export const stripe = stripeSecretKey 
+  ? new Stripe(stripeSecretKey, { apiVersion: '2025-12-15.clover' })
+  : null;
+
+// Stripeが設定されていない場合のヘルパー
+export function requireStripe(): Stripe {
+  if (!stripe) {
+    throw new Error('STRIPE_SECRET_KEY is not set. Stripe features are disabled.');
+  }
+  return stripe;
+}
 
 export async function checkSubscriptionStatus(customerId: string): Promise<{
   isActive: boolean;
   subscription?: Stripe.Subscription;
 }> {
+  // Stripeが設定されていない場合はスキップ（Utageで決済する場合）
+  if (!stripe) {
+    console.log('Stripe is not configured, skipping subscription check');
+    return { isActive: false };
+  }
+  
   try {
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
@@ -35,6 +48,12 @@ export async function checkSubscriptionStatus(customerId: string): Promise<{
 }
 
 export async function getCustomerByEmail(email: string): Promise<Stripe.Customer | null> {
+  // Stripeが設定されていない場合はスキップ（Utageで決済する場合）
+  if (!stripe) {
+    console.log('Stripe is not configured, skipping customer lookup');
+    return null;
+  }
+  
   try {
     const customers = await stripe.customers.list({
       email,
