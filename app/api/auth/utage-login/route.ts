@@ -279,15 +279,21 @@ export async function POST(request: NextRequest) {
     let stripeCustomerId = customerId;
     let subscriptionStatus = { isActive: false };
 
-    if (isDevelopment) {
-      // 開発環境: サブスクリプション確認をスキップ
+    // Utage経由のログイン（リファラーがUtageの場合）はStripeチェックをスキップ
+    // 決済はUtage側で完了しているため、ここでは認証のみ行う
+    const isUtageLogin = isFromUtage || isFromApp;
+    
+    if (isDevelopment || isUtageLogin) {
+      // 開発環境またはUtage経由: サブスクリプション確認をスキップ
+      // Utageで決済完了しているユーザーは、Utage会員ページからアクセスしてくる
       subscriptionStatus = { isActive: true };
-      // ダミーの顧客IDを設定
+      // Utageユーザー用のIDを設定
       if (!stripeCustomerId) {
-        stripeCustomerId = `dev_customer_${Date.now()}`;
+        stripeCustomerId = `utage_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
       }
+      console.log('Utage login - skipping Stripe check:', maskEmail(email));
     } else {
-      // 本番環境: Stripeでサブスクリプション状態を確認
+      // 直接アクセス（Utage経由でない場合）: Stripeでサブスクリプション状態を確認
       if (!stripeCustomerId) {
         const customer = await getCustomerByEmail(email);
         if (!customer) {
