@@ -293,34 +293,14 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // /login-utage と /auth/login-utage へのアクセスをUtageからのみ許可
+  // /login-utage と /auth/login-utage へのアクセスは常に許可（ログインページは誰でもアクセス可能）
   if (request.nextUrl.pathname === '/login-utage' || request.nextUrl.pathname === '/auth/login-utage') {
-    // 開発環境では、ngrok経由のアクセスを許可
-    const isNgrok = request.nextUrl.hostname.includes('ngrok-free.app') || 
-                    request.nextUrl.hostname.includes('ngrok.io') ||
-                    request.nextUrl.hostname === 'localhost';
-    
-    if (isNgrok && process.env.NODE_ENV !== 'production') {
-      // 開発環境でngrok経由の場合は許可（refererがない場合でも）
-      console.log('開発環境: /login-utageへのngrok経由アクセスを許可:', { 
-        hostname: request.nextUrl.hostname,
-        pathname: request.nextUrl.pathname,
-        referer,
-        origin
-      });
-      return response;
-    }
-    
-    // 有料会員の場合のみUtageからのアクセスを要求
-    const userPlan = request.cookies.get('user_plan')?.value || 'free';
-    const isPremiumUser = userPlan === 'premium';
-    
-    if (isPremiumUser && !hasUtageAccess) {
-      return new NextResponse(getAccessDeniedHTML('有料会員のログインページへのアクセスは会員ページからのみ許可されています。会員ページからログインしてください。', true), {
-        status: 403,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
-    }
+    console.log('ログインページへのアクセスを許可:', { 
+      pathname: request.nextUrl.pathname,
+      referer,
+      origin
+    });
+    return response;
   }
 
   // ユーザーのプラン情報を取得（有料会員かどうかを判定）
