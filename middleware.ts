@@ -312,19 +312,30 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/', '/help', '/subscribe'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
-  // 保護されたページへのアクセスにはトークンが必要
+  // 保護されたページへのアクセスにはトークンまたはUtageアクセスフラグが必要
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
+    const hasUtageAccess = request.cookies.get('utage_access')?.value === 'true';
     
-    // トークンの有無をログ
-    console.log('保護ページへのアクセス:', {
+    // トークンもUtageアクセスもない場合はアクセス拒否
+    if (!authToken && !hasUtageAccess) {
+      console.warn('認証なしでの保護ページへのアクセスを拒否:', {
+        pathname: request.nextUrl.pathname,
+        hasToken: !!authToken,
+        hasUtageAccess,
+      });
+      
+      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。メールのリンクからログインしてください。', true), {
+        status: 403,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+    
+    console.log('認証OK: アクセス許可', {
       pathname: request.nextUrl.pathname,
       hasToken: !!authToken,
-      allCookies: request.cookies.getAll().map(c => c.name),
+      hasUtageAccess,
     });
-    
-    // 一時的に認証チェックをスキップ（デバッグ用）
-    // TODO: 本番前に戻す
   }
 
   return response;
