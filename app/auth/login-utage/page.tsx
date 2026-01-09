@@ -62,10 +62,8 @@ function UtageLoginContent() {
 
       setStatus('success');
       
-      // ホームページにリダイレクト
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
+      // ホームページにリダイレクト（即座に）
+      window.location.href = '/';
     } catch (error) {
       console.error('Login error:', error);
       setStatus('error');
