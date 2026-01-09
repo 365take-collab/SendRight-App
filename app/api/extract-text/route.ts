@@ -242,6 +242,14 @@ export async function POST(request: NextRequest) {
 【最優先タスク】
 画像内に表示されている**実際のメッセージのみ**を読み取り、会話の全体と相手（女性）からの最新のメッセージを抽出してください。
 
+【重要：メッセージの位置と送信者の判別】
+LINEやマッチングアプリでは：
+- **右側のメッセージ** = 自分（プレイヤー）が送ったメッセージ
+- **左側のメッセージ** = 相手（女性）が送ったメッセージ
+- 背景色も異なる場合が多い（自分=緑や青、相手=白やグレー）
+
+**両方のメッセージを必ず抽出してください。**
+
 【重要な除外ルール】
 以下のUI要素や説明欄は**一切抽出しないでください**：
 - ❌ アプリの説明欄、説明文、ヘルプテキスト、ガイド文
@@ -254,7 +262,6 @@ export async function POST(request: NextRequest) {
 - ❌ その他のUI要素やシステムメッセージ
 
 **抽出するのは、実際に送信されたメッセージの内容のみです。**
-**注意**: 「説明」という単語だけのメッセージは、実際のメッセージ内容の可能性があるため、抽出してください。
 
 【実行手順】
 
@@ -265,47 +272,48 @@ export async function POST(request: NextRequest) {
    - メッセージアプリの画面であることを確認
 
 2. 会話の構造を理解
-   - メッセージの配置を確認（通常は上から下、または下から上）
-   - 送信者（自分）と受信者（相手・女性）のメッセージを区別
-   - 時系列を把握（最新のメッセージは通常画面の下の方）
+   - **右側のメッセージ = 自分（プレイヤー）**
+   - **左側のメッセージ = 相手（女性）**
+   - 時系列は上から下（最新は画面下部）
 
 3. 会話全体を抽出
-   - **実際に送信されたメッセージのみ**を時系列順に抽出
-   - 送信者（自分）と受信者（相手・女性）を区別して記録
+   - **自分（右側）と相手（左側）の両方のメッセージ**を時系列順に抽出
+   - 「自分:」「相手:」のラベルで区別
    - 各メッセージの全文を正確に抽出（絵文字、スタンプ、改行も含む）
    - UI要素や説明欄は一切含めない
 
 4. 最新メッセージを特定
-   - 画面内で最も新しい（最後に送信された）相手からのメッセージを見つける
+   - 画面内で最も新しい（最後に送信された）**相手（左側）からのメッセージ**を見つける
    - そのメッセージの全文を確認
-   - 説明欄やUI要素は除外する
 
 【必須出力形式】
-以下の形式で必ず出力してください。他の形式は使用しないでください：
+以下の形式で必ず出力してください：
 
 会話履歴:
-[送信者名]: [メッセージ内容]
-[送信者名]: [メッセージ内容]
+自分: [右側のメッセージ内容]
+相手: [左側のメッセージ内容]
+自分: [右側のメッセージ内容]
+相手: [左側のメッセージ内容]
 ...
 
-最新のメッセージ: [ここに相手からの最新メッセージの全文をそのまま貼り付け]
+最新のメッセージ: [相手（左側）からの最新メッセージの全文]
 
 【重要なルール】
-1. **実際のメッセージのみ**を抽出してください（UI要素や説明欄は除外）
-2. 画像が暗い、小さい、ぼやけている場合でも、可能な限りメッセージを読み取ってください
-3. 推測や要約は一切せず、実際のメッセージ内容をそのまま抽出してください
-4. 部分的な抽出は避け、メッセージの全文を正確に抽出してください
+1. **右側=自分、左側=相手** を必ず守ってください
+2. **自分のメッセージも必ず抽出**してください（会話の文脈理解に重要）
+3. 画像が暗い、小さい、ぼやけている場合でも、可能な限りメッセージを読み取ってください
+4. 推測や要約は一切せず、実際のメッセージ内容をそのまま抽出してください
 5. 絵文字、スタンプ、改行、記号も正確に含めてください
-6. メッセージが見つからない場合のみ、「メッセージが見つかりませんでした」と出力してください
-7. 「申し訳ありません」や「抽出できません」などの言い訳は一切不要です。必ず抽出を試みてください
-8. **説明欄、ボタン、プレースホルダー、UI要素は一切抽出しないでください**
+6. 「申し訳ありません」や「抽出できません」などの言い訳は不要です
 
 【出力例】
-画像に「おはよう！今日は何してる？😊」というメッセージが表示されている場合：
-最新のメッセージ: おはよう！今日は何してる？😊
+会話履歴:
+自分: 今日何してた？
+相手: 買い物行ってきた！
+自分: いいね、何買ったの？
+相手: 服見てたんだけど結局買わなかった😅
 
-画像に「ありがとう💕」というメッセージが表示されている場合：
-最新のメッセージ: ありがとう💕
+最新のメッセージ: 服見てたんだけど結局買わなかった😅
 
 必ず上記の形式で出力してください。`,
             },
@@ -513,13 +521,20 @@ export async function POST(request: NextRequest) {
         // 「[送信者名]: [メッセージ]」形式をパース
         const messageMatch = line.match(/^(.+?)[：:]\s*(.+)$/);
         if (messageMatch) {
-          const sender = messageMatch[1].trim();
+          const sender = messageMatch[1].trim().toLowerCase();
           const content = messageMatch[2].trim();
           
-          // 送信者名から自分か相手かを判断（簡易的な判定）
-          if (sender.includes('自分') || sender.includes('私') || sender.includes('user') || sender.includes('User')) {
+          // 送信者名から自分か相手かを判断
+          // 自分（プレイヤー）のメッセージ
+          if (sender.includes('自分') || sender.includes('私') || sender === 'user' || sender === 'me' || sender.includes('右')) {
             conversationHistory.push({ role: 'user', content });
-          } else {
+          } 
+          // 相手（女性）のメッセージ
+          else if (sender.includes('相手') || sender.includes('彼女') || sender.includes('女') || sender.includes('左') || sender === 'her' || sender === 'she') {
+            conversationHistory.push({ role: 'assistant', content });
+          }
+          // その他は相手として扱う
+          else {
             conversationHistory.push({ role: 'assistant', content });
           }
         }
@@ -534,12 +549,15 @@ export async function POST(request: NextRequest) {
         if (line.includes(':') || line.includes('：')) {
           const parts = line.split(/[：:]/);
           if (parts.length >= 2) {
-            const sender = parts[0].trim();
+            const sender = parts[0].trim().toLowerCase();
             const content = parts.slice(1).join(':').trim();
             if (content.length > 0) {
-              if (sender.includes('自分') || sender.includes('私') || sender.includes('user')) {
+              // 自分（プレイヤー）のメッセージ
+              if (sender.includes('自分') || sender.includes('私') || sender === 'user' || sender === 'me') {
                 conversationHistory.push({ role: 'user', content });
-              } else if (!sender.includes('最新') && !sender.includes('メッセージ')) {
+              } 
+              // 相手のメッセージ（「最新」「メッセージ」などのラベルは除外）
+              else if (!sender.includes('最新') && !sender.includes('メッセージ') && !sender.includes('会話履歴')) {
                 conversationHistory.push({ role: 'assistant', content });
               }
             }

@@ -1,10 +1,18 @@
 import OpenAI from 'openai';
 
-// OpenAI APIを使用（GPT-4o-mini: 高品質でコスト効率の良いモデル）
-// 環境変数 OPENAI_API_KEY が設定されている場合はOpenAIを使用
+// AI Provider設定
+// DEEPSEEK_API_KEYがあればDeepSeek、なければOpenAIを使用
+const useDeepSeek = !!process.env.DEEPSEEK_API_KEY;
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: useDeepSeek ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY,
+  baseURL: useDeepSeek ? 'https://api.deepseek.com' : undefined,
 });
+
+// 使用するモデル
+const AI_MODEL = useDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini';
+
+console.log(`AI Provider: ${useDeepSeek ? 'DeepSeek V3' : 'OpenAI GPT-4o-mini'}`);
 
 export interface MessageContext {
   herMessage: string;
@@ -285,9 +293,9 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
   });
 
   try {
-    // メインの返信生成（OpenAI GPT-4o-mini）
+    // メインの返信生成
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // OpenAI: GPT-4o-mini（入力$0.15/1M、出力$0.60/1M、高品質でコスト効率の良いモデル）
+      model: AI_MODEL,
       messages,
       temperature: 0.85, // 自然な会話のために少し上げる（0.7→0.85）
       max_tokens: 500, // 返信（1-2文）と解説を含む（解説が切れないように増加：250→500）
@@ -397,7 +405,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
 
       // 代替返信候補の生成
       alternativeCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini', // OpenAI: GPT-4o-mini（入力$0.15/1M、出力$0.60/1M、高品質でコスト効率の良いモデル）
+        model: AI_MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: alternativePrompt }

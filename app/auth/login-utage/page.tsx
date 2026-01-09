@@ -8,8 +8,9 @@ import { Loader2 } from 'lucide-react';
 function UtageLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'input' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [inputEmail, setInputEmail] = useState<string>('');
 
   useEffect(() => {
     const email = searchParams.get('email');
@@ -17,15 +18,22 @@ function UtageLoginContent() {
     console.log('ログインページ - パラメータ確認:', { email });
 
     if (!email) {
-      console.error('メールアドレスが取得できませんでした');
-      setStatus('error');
-      setErrorMessage('メールアドレスが取得できませんでした。会員ページから再度アクセスしてください。');
+      console.log('メールアドレスがURLにないため、入力フォームを表示');
+      setStatus('input');
       return;
     }
 
     console.log('ログイン処理を開始します');
     handleLogin(email);
   }, [searchParams]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputEmail.trim()) {
+      setStatus('loading');
+      handleLogin(inputEmail.trim());
+    }
+  };
 
   const handleLogin = async (email: string) => {
     try {
@@ -78,6 +86,30 @@ function UtageLoginContent() {
           <div className="text-center">
             <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
             <p className="text-gray-300 text-lg">SendRightアプリにログイン中...</p>
+          </div>
+        )}
+
+        {status === 'input' && (
+          <div className="text-center">
+            <div className="text-blue-400 text-5xl mb-4">📧</div>
+            <h2 className="text-gray-200 font-semibold text-xl mb-2">SendRightにログイン</h2>
+            <p className="text-sm text-gray-400 mb-6">購入時に登録したメールアドレスを入力してください</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="email"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                placeholder="メールアドレス"
+                required
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition font-medium"
+              >
+                ログイン
+              </button>
+            </form>
           </div>
         )}
 

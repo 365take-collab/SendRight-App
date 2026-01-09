@@ -172,6 +172,11 @@ function getAccessDeniedHTML(message: string, showUtageOption: boolean = true, m
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
   
+  // 開発環境では全ての認証をスキップ
+  if (process.env.NODE_ENV === 'development') {
+    return response;
+  }
+  
   // 異常検出のための情報を取得
   const clientIP = getClientIP(request.headers);
   const userId = request.cookies.get('userId')?.value || 'anonymous';
@@ -309,6 +314,14 @@ export async function middleware(request: NextRequest) {
   
   // 保護されたページへのアクセスにはトークンが必要
   if (isProtectedPath) {
+    // 開発環境では認証をスキップ
+    if (process.env.NODE_ENV === 'development') {
+      console.log('開発環境: 認証をスキップ', {
+        pathname: request.nextUrl.pathname,
+      });
+      return response;
+    }
+    
     const authToken = request.cookies.get('token')?.value;
     
     // トークンがない場合はアクセス拒否
