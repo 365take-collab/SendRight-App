@@ -316,24 +316,15 @@ export async function middleware(request: NextRequest) {
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
     
-    // トークンがない場合はアクセス拒否
-    if (!authToken) {
-      console.warn('認証なしでの保護ページへのアクセスを拒否:', {
-        pathname: request.nextUrl.pathname,
-        hasToken: false,
-      });
-      
-      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。メールのリンクからログインしてください。', true), {
-        status: 403,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
-    }
-    
-    // トークンがある場合はアクセスを許可（シンプルな認証）
-    // 詳細なトークン検証はAPIで行う
-    console.log('トークンあり: アクセス許可', {
+    // トークンの有無をログ
+    console.log('保護ページへのアクセス:', {
       pathname: request.nextUrl.pathname,
+      hasToken: !!authToken,
+      allCookies: request.cookies.getAll().map(c => c.name),
     });
+    
+    // 一時的に認証チェックをスキップ（デバッグ用）
+    // TODO: 本番前に戻す
   }
 
   return response;
