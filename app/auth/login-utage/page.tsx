@@ -64,9 +64,10 @@ function UtageLoginContent() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('userId', data.user.id);
 
-      // Utageアクセスフラグも設定
+      // Utageアクセスフラグも設定（クッキーとsessionStorage両方）
       document.cookie = `utage_access=true; path=/; max-age=${24 * 60 * 60}; secure; samesite=lax`;
       document.cookie = `utage_access_timestamp=${Date.now()}; path=/; max-age=${24 * 60 * 60}; secure; samesite=lax`;
+      sessionStorage.setItem('utage_access', 'true');
 
       setStatus('success');
       
