@@ -303,38 +303,6 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ユーザーのプラン情報を取得（有料会員かどうかを判定）
-  const userPlan = request.cookies.get('user_plan')?.value || 'free';
-  const isPremiumUser = userPlan === 'premium';
-  
-  // 有料会員の場合、ログイン済みで課金期間中ならURLから直接アクセス可能
-  let hasActiveSubscription = false;
-  let subscriptionCheckError = false;
-  if (isPremiumUser) {
-    try {
-      // JWTトークンからユーザーIDを取得
-      const authToken = request.cookies.get('token')?.value;
-      if (authToken) {
-        const tokenData = verifyToken(authToken);
-        if (tokenData) {
-          const user = await findUserById(tokenData.userId);
-          if (user && checkSubscription(user)) {
-            hasActiveSubscription = true;
-            console.log('有料会員: ログイン済みで課金期間中 - URLから直接アクセス許可', {
-              userId: user.id,
-              email: user.email,
-              subscriptionExpiresAt: user.subscriptionExpiresAt,
-              pathname: request.nextUrl.pathname,
-            });
-          }
-        }
-      }
-    } catch (error) {
-      subscriptionCheckError = true;
-      console.error('課金期間確認エラー:', error);
-    }
-  }
-  
   // 認証が必要なページ（メインアプリ）
   const protectedPaths = ['/', '/help', '/subscribe'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
@@ -343,72 +311,24 @@ export async function middleware(request: NextRequest) {
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
     
-    // トークンがあればアクセスを許可（シンプルな認証）
-    if (authToken) {
-      console.log('トークンあり: アクセス許可', {
+    // トークンがない場合はアクセス拒否
+    if (!authToken) {
+      console.warn('認証なしでの保護ページへのアクセスを拒否:', {
         pathname: request.nextUrl.pathname,
+        hasToken: false,
       });
-      return response;
+      
+      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。メールのリンクからログインしてください。', true), {
+        status: 403,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
     }
     
-    // トークンがない場合は、Utage会員ページへリダイレクト
-    console.warn('認証なしでの保護ページへのアクセスを拒否:', {
+    // トークンがある場合はアクセスを許可（シンプルな認証）
+    // 詳細なトークン検証はAPIで行う
+    console.log('トークンあり: アクセス許可', {
       pathname: request.nextUrl.pathname,
-      hasToken: false,
     });
-      
-      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。会員ページからログインしてください。', true), {
-        status: 403,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
-    }
-    
-    // トークンを検証
-    try {
-      const tokenData = verifyToken(authToken);
-      if (!tokenData) {
-        console.warn('無効なトークンでのアクセスを拒否:', {
-          pathname: request.nextUrl.pathname,
-        });
-        
-        // 無効なトークンを削除
-        response.cookies.delete('token');
-        response.cookies.delete('userId');
-        
-        return new NextResponse(getAccessDeniedHTML('セッションの有効期限が切れています。会員ページから再度ログインしてください。', true), {
-          status: 403,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        });
-      }
-      
-      // トークンが有効な場合、ユーザーのサブスクリプション状態を確認
-      const user = await findUserById(tokenData.userId);
-      if (!user || !checkSubscription(user)) {
-        console.warn('サブスクリプションが無効なユーザーのアクセスを拒否:', {
-          pathname: request.nextUrl.pathname,
-          userId: tokenData.userId,
-          hasUser: !!user,
-          isSubscribed: user?.isSubscribed,
-        });
-        
-        return new NextResponse(getAccessDeniedHTML('サブスクリプションが有効ではありません。会員ページでお支払い状況をご確認ください。', true), {
-          status: 403,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        });
-      }
-      
-      console.log('認証済みユーザー: アクセス許可', {
-        pathname: request.nextUrl.pathname,
-        userId: user.id,
-      });
-    } catch (error) {
-      console.error('トークン検証エラー:', error);
-      
-      return new NextResponse(getAccessDeniedHTML('認証エラーが発生しました。会員ページから再度ログインしてください。', true), {
-        status: 403,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
-    }
   }
 
   return response;
