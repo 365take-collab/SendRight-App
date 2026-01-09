@@ -335,53 +335,6 @@ export async function middleware(request: NextRequest) {
     }
   }
   
-  // 有料会員のみUtageからのアクセス制限を適用
-  // 無料ユーザーは自由にアクセス可能
-  // ログイン済みで課金期間中の場合は、Utageからのアクセスでなくても許可
-  // 課金期間確認でエラーが発生した場合も、Utage経由でのアクセスを促す
-  if (isPremiumUser && !hasUtageAccess && !hasActiveSubscription && request.nextUrl.pathname !== '/login-utage' && request.nextUrl.pathname !== '/auth/login-utage') {
-    // 開発環境では、ngrok経由のアクセスを許可
-    const isNgrok = request.nextUrl.hostname.includes('ngrok-free.app') || 
-                    request.nextUrl.hostname.includes('ngrok.io') ||
-                    request.nextUrl.hostname === 'localhost';
-    
-    if (isNgrok && process.env.NODE_ENV !== 'production') {
-      // 開発環境でngrok経由の場合は許可（refererがない場合でも）
-      console.log('開発環境: ngrok経由のアクセスを許可:', { 
-        hostname: request.nextUrl.hostname,
-        pathname: request.nextUrl.pathname
-      });
-      return response;
-    }
-    
-    console.warn('有料会員: Utage以外からのアクセスを拒否:', { 
-      referer, 
-      origin, 
-      pathname: request.nextUrl.pathname,
-      utageSession,
-      hostname: request.nextUrl.hostname,
-      userPlan
-    });
-    
-    // セッションが期限切れか、セッションがない場合のメッセージ
-    const isSessionExpired = utageSession && sessionTimestamp && (now - sessionTimestamp >= sessionMaxAge);
-    const hasSessionButExpired = isSessionExpired;
-    
-    let message = '';
-    if (subscriptionCheckError) {
-      message = '課金状況の確認中にエラーが発生しました。会員ページから再度ログインしてください。';
-    } else if (hasSessionButExpired) {
-      message = 'セッションの有効期限が切れています。会員ページから再度ログインしてください。';
-    } else {
-      message = 'このアプリへのアクセスにはログインが必要です。会員ページからログインしてください。';
-    }
-    
-    return new NextResponse(getAccessDeniedHTML(message, true), {
-      status: 403,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
-  }
-  
   // 認証が必要なページ（メインアプリ）
   const protectedPaths = ['/', '/help', '/subscribe'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
@@ -390,12 +343,19 @@ export async function middleware(request: NextRequest) {
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
     
-    if (!authToken) {
-      // トークンがない場合は、Utage会員ページへリダイレクト
-      console.warn('認証なしでの保護ページへのアクセスを拒否:', {
+    // トークンがあればアクセスを許可（シンプルな認証）
+    if (authToken) {
+      console.log('トークンあり: アクセス許可', {
         pathname: request.nextUrl.pathname,
-        hasToken: false,
       });
+      return response;
+    }
+    
+    // トークンがない場合は、Utage会員ページへリダイレクト
+    console.warn('認証なしでの保護ページへのアクセスを拒否:', {
+      pathname: request.nextUrl.pathname,
+      hasToken: false,
+    });
       
       return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。会員ページからログインしてください。', true), {
         status: 403,
