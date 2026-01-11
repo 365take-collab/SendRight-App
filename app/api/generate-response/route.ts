@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出
-      if (detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now())) {
+      // 異常なアクセスパターンを検出（埋め込みモードではスキップ）
+      if (!isEmbedToken && detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now())) {
         console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname });
         return NextResponse.json(
           { error: '異常なアクセスパターンが検出されました' },
