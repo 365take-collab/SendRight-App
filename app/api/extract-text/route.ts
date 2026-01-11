@@ -27,46 +27,9 @@ export async function POST(request: NextRequest) {
                       request.nextUrl.hostname === 'localhost' ||
                       request.nextUrl.hostname.includes('ngrok');
 
-    // 本番環境でのみUtageからのアクセスのみを許可
-    if (!isDevMode) {
-      const referer = request.headers.get('referer') || request.headers.get('referrer');
-      const origin = request.headers.get('origin');
-      const allowedUtageDomains = [
-        'utage-system.com',
-        'utage.jp',
-        'utage.co.jp',
-      ];
-
-      const isFromUtage = (referer && allowedUtageDomains.some(domain => referer.includes(domain))) ||
-                          (origin && allowedUtageDomains.some(domain => origin.includes(domain)));
-
-      // Utage以外からのアクセスを拒否（Utageからのアクセスのみ許可）
-      if (!isFromUtage) {
-        console.warn('Utage以外からのAPIアクセスを拒否:', { referer, origin, hostname: request.nextUrl.hostname });
-        return NextResponse.json(
-          { error: 'このAPIへのアクセスはUtageからのみ許可されています', extractedText: '', message: '' },
-          { status: 403 }
-        );
-      }
-    }
-
-    // IPアドレスのホワイトリストをチェック（開発環境ではスキップ）
-    if (!isDevMode) {
-      const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-                       request.headers.get('x-real-ip') || 
-                       request.ip || 
-                       'unknown';
-      
-      if (!checkIPWhitelist(clientIP)) {
-        console.warn('IPホワイトリストに含まれていないIPからのアクセスを拒否:', { ip: clientIP });
-        return NextResponse.json(
-          { error: 'このIPアドレスからのアクセスは許可されていません', extractedText: '', message: '' },
-          { status: 403 }
-        );
-      }
-    }
-
-    // 開発環境では認証をスキップ（isDevModeは上で定義済み）
+    // 認証チェック（開発環境ではスキップ）
+    // 注意: refererやIPチェックは削除。認証トークンがあれば十分。
+    // メールからのログインユーザーも使えるようにする。
     if (!isDevMode) {
       // Check authentication
       const authHeader = request.headers.get('authorization');
@@ -94,13 +57,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Utageからのログインで作成されたユーザーのみ許可
-      if (!user.isUtageUser) {
-        console.warn('Utage以外からのログインで作成されたユーザーのアクセスを拒否:', { userId: user.id, email: user.email });
-        return NextResponse.json(
-          { error: 'このアプリへのアクセスはUtageからのログインのみ許可されています', extractedText: '', message: '' },
-          { status: 403 }
-        );
+      // Utageユーザーチェックを削除（メールからのログインユーザーも許可）
+      // サブスクリプションチェックのみ残す（有料ユーザーのみ使用可能）
       }
 
       // Check subscription
