@@ -43,8 +43,10 @@ export default function Home() {
 
 
   useEffect(() => {
-    // 埋め込みモードとメールアドレスをURLパラメータから検出
+    // URLパラメータを取得
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // 埋め込みモードとメールアドレスをURLパラメータから検出
     const embedMode = urlParams.get('utage_embed') === 'true';
     const emailFromUrl = urlParams.get('email');
     
@@ -53,9 +55,16 @@ export default function Home() {
       // 埋め込みモードの場合、Utageアクセスフラグを設定
       sessionStorage.setItem('utage_access', 'true');
       
-      // メールアドレスが有効な場合、自動ログイン
+      // 埋め込みモードではUtageで認証済みなので、ダミーユーザーを設定
+      setUser({
+        id: 'utage-embed-user',
+        email: emailFromUrl || 'utage@example.com',
+        isSubscribed: true,
+      });
+      setToken('utage-embed-token');
+      
+      // メールアドレスが有効な場合、自動ログインも試行
       if (emailFromUrl && emailFromUrl !== '%mail%' && !emailFromUrl.includes('%')) {
-        // メールアドレスを使って自動ログイン処理
         fetch('/api/auth/utage-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -66,7 +75,6 @@ export default function Home() {
             if (data.token) {
               localStorage.setItem('token', data.token);
               setToken(data.token);
-              sessionStorage.setItem('utage_access', 'true');
             }
           })
           .catch(err => console.error('Auto login error:', err));
@@ -84,7 +92,6 @@ export default function Home() {
     }
 
     // Utage決済完了後のコールバック処理
-    const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('upgrade_success') === 'true') {
       const limit = urlParams.get('limit');
       if (limit) {
@@ -565,7 +572,8 @@ export default function Home() {
   }, [error]);
 
   // ログインしていない場合、Utageへの誘導ページを表示
-  if (!user && !isDevMode) {
+  // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
+  if (!user && !isDevMode && !isEmbedMode) {
     return (
       <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
         {/* 背景 */}
