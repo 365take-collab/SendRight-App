@@ -40,6 +40,22 @@ export async function POST(request: NextRequest) {
       // Utage会員サイトにログイン済みユーザーからのアクセス
       const isEmbedToken = token === 'utage-embed-token' || token === 'utage-token';
       
+      // 埋め込みトークンの場合、Refererをチェック（セキュリティ強化）
+      if (isEmbedToken) {
+        const referer = request.headers.get('referer') || '';
+        const isValidReferer = referer.includes('utage-system.com') || 
+                               referer.includes('utage.jp') || 
+                               referer.includes('sendright.jp') ||
+                               referer.includes('localhost');
+        if (!isValidReferer) {
+          console.warn('Invalid referer for embed token:', referer);
+          return NextResponse.json(
+            { error: '不正なアクセスです' },
+            { status: 403 }
+          );
+        }
+      }
+      
       let user = null;
       
       if (isEmbedToken) {
