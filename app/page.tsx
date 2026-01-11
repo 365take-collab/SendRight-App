@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit } from '@/lib/api';
-import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle } from 'lucide-react';
+import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, ClipboardCheck } from 'lucide-react';
 import OnboardingModal from '@/app/components/OnboardingModal';
+import Dashboard from '@/app/components/Dashboard';
+import { recordSuccess } from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
@@ -244,8 +246,15 @@ export default function Home() {
       return;
     }
 
-    if (!isDevMode && (!token || !user?.isSubscribed)) {
-      setError('サブスクリプションが必要です');
+    // 無料プランでも使用可能（制限付き）
+    if (!isDevMode && !token) {
+      setError('ログインが必要です');
+      return;
+    }
+    
+    // 使用回数制限のチェック
+    if (!isDevMode && usageInfo && usageInfo.remaining === 0) {
+      setError('今日の無料アドバイスを使い切りました。アップグレードするか、明日またお試しください。');
       return;
     }
 
@@ -367,74 +376,123 @@ export default function Home() {
     setError('');
 
     try {
-      // Convert image to base64
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        setUploadedImage(base64String);
-
-        // Extract text from image
-        try {
-          console.log('画像からテキストを抽出中...', { hasToken: !!token, isDevMode });
-          const result = await extractTextFromImage(token || 'dev-token', base64String);
-          console.log('抽出結果:', result);
-          if (result.message && result.message.length > 0) {
-            setHerMessage(result.message);
-            // 会話全体のテキストを保存（返信生成時に使用）
-            if (result.extractedText && result.extractedText.length > 0) {
-              setFullConversationText(result.extractedText);
-              console.log('会話全体のテキストを保存:', result.extractedText.substring(0, 100) + '...');
-            }
-            setError('');
-            
-            // 自動的に返信を生成
-            setTimeout(async () => {
-              try {
-                setIsLoading(true);
-                setError('');
-                setAiResponse('');
-                setAiExplanation('');
-                
-                // 前提情報を文字列に変換
-                const profileContext = Object.values(profileInfo).some(v => v.trim()) 
-                  ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
-                  : undefined;
-                
-                const responseResult = await generateAIResponse(
-                  token || 'dev-token', 
-                  result.message, 
-                  undefined,
-                  undefined,
-                  result.extractedText || undefined,
-                  profileContext
-                );
-                setAiResponse(responseResult.response);
-                setAiExplanation(responseResult.explanation);
-                setAlternativeResponses(responseResult.alternatives || []);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : '返信の生成に失敗しました');
-              } finally {
-                setIsLoading(false);
+      // 画像をJPEG形式に変換し、サイズを最適化する関数
+      const convertToJpeg = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new window.Image();
+          const reader = new FileReader();
+          
+          reader.onload = (e) => {
+            img.onload = () => {
+              // 最大幅を1920pxに制限
+              const maxWidth = 1920;
+              const maxHeight = 1920;
+              let { width, height } = img;
+              
+              if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
               }
-            }, 500); // 少し待ってから実行（UI更新のため）
-          } else {
-            // エラーメッセージがある場合はそれを使用、ない場合はデフォルトメッセージ
-            const errorMsg = result.error || 'メッセージを抽出できませんでした。\n\n以下の点を確認してください：\n1. 画像がLINEやDMの会話画面であること\n2. 画像が鮮明で、テキストが読み取れること\n3. メッセージが表示されていること\n4. 画像サイズが10MB以下であること';
-            setError(errorMsg);
+              
+              // Canvasで画像を変換
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              
+              if (!ctx) {
+                reject(new Error('Canvas context を取得できませんでした'));
+                return;
+              }
+              
+              // 白い背景を描画（透過PNG対策）
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, width, height);
+              
+              // 画像を描画
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              // JPEG形式でBase64に変換（品質85%）
+              const jpegBase64 = canvas.toDataURL('image/jpeg', 0.85);
+              resolve(jpegBase64);
+            };
+            
+            img.onerror = () => {
+              reject(new Error('画像の読み込みに失敗しました'));
+            };
+            
+            img.src = e.target?.result as string;
+          };
+          
+          reader.onerror = () => {
+            reject(new Error('ファイルの読み込みに失敗しました'));
+          };
+          
+          reader.readAsDataURL(file);
+        });
+      };
+
+      // 画像をJPEG形式に変換
+      const base64String = await convertToJpeg(file);
+      setUploadedImage(base64String);
+
+      // Extract text from image
+      try {
+        console.log('画像からテキストを抽出中...', { hasToken: !!token, isDevMode });
+        const result = await extractTextFromImage(token || 'dev-token', base64String);
+        console.log('抽出結果:', result);
+        if (result.message && result.message.length > 0) {
+          setHerMessage(result.message);
+          // 会話全体のテキストを保存（返信生成時に使用）
+          if (result.extractedText && result.extractedText.length > 0) {
+            setFullConversationText(result.extractedText);
+            console.log('会話全体のテキストを保存:', result.extractedText.substring(0, 100) + '...');
           }
-        } catch (err) {
-          console.error('テキスト抽出エラー:', err);
-          const errorMessage = err instanceof Error ? err.message : 'テキストの抽出に失敗しました';
-          setError(`${errorMessage}\n\n画像を確認して、再度お試しください。`);
-        } finally {
-          setIsExtracting(false);
+          setError('');
+          
+          // 自動的に返信を生成
+          setTimeout(async () => {
+            try {
+              setIsLoading(true);
+              setError('');
+              setAiResponse('');
+              setAiExplanation('');
+              
+              // 前提情報を文字列に変換
+              const profileContext = Object.values(profileInfo).some(v => v.trim()) 
+                ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
+                : undefined;
+              
+              const responseResult = await generateAIResponse(
+                token || 'dev-token', 
+                result.message, 
+                undefined,
+                undefined,
+                result.extractedText || undefined,
+                profileContext
+              );
+              setAiResponse(responseResult.response);
+              setAiExplanation(responseResult.explanation);
+              setAlternativeResponses(responseResult.alternatives || []);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : '返信の生成に失敗しました');
+            } finally {
+              setIsLoading(false);
+            }
+          }, 500); // 少し待ってから実行（UI更新のため）
+        } else {
+          // エラーメッセージがある場合はそれを使用、ない場合はデフォルトメッセージ
+          const errorMsg = result.error || 'メッセージを抽出できませんでした。\n\n以下の点を確認してください：\n1. 画像がLINEやDMの会話画面であること\n2. 画像が鮮明で、テキストが読み取れること\n3. メッセージが表示されていること\n4. 画像サイズが10MB以下であること';
+          setError(errorMsg);
         }
-      };
-      reader.onerror = () => {
-        setError('画像の読み込みに失敗しました');
+      } catch (err) {
+        console.error('テキスト抽出エラー:', err);
+        const errorMessage = err instanceof Error ? err.message : 'テキストの抽出に失敗しました';
+        setError(`${errorMessage}\n\n画像を確認して、再度お試しください。`);
+      } finally {
         setIsExtracting(false);
-      };
-      reader.readAsDataURL(file);
+      }
     } catch (err) {
       setError('画像の処理に失敗しました');
       setIsExtracting(false);
@@ -505,11 +563,15 @@ export default function Home() {
               </Link>
             </div>
             <div className="flex items-center space-x-6">
-              {(user?.isSubscribed || isDevMode) ? (
+              {(user || isDevMode) ? (
                 <div className="flex items-center space-x-4">
                   <span className="flex items-center text-base text-gray-300 font-medium">
-                    <Crown className="w-5 h-5 mr-2 text-blue-400" />
-                    {isDevMode ? '開発モード' : '会員'}
+                    {user?.isSubscribed ? (
+                      <Crown className="w-5 h-5 mr-2 text-yellow-400" />
+                    ) : (
+                      <Zap className="w-5 h-5 mr-2 text-blue-400" />
+                    )}
+                    {isDevMode ? '開発モード' : user?.isSubscribed ? 'プロ会員' : '無料プラン'}
                   </span>
                   {usageInfo && !isDevMode && (
                     <div className="flex flex-col items-end gap-1">
@@ -552,6 +614,33 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 py-20">
         <OnboardingModal />
+        
+        {/* ダッシュボード（ストリーク・統計表示） */}
+        <div className="mb-8">
+          <Dashboard token={token} isDevMode={isDevMode} />
+        </div>
+        
+        {/* プロフィール診断へのリンク */}
+        <Link
+          href="/profile-diagnosis"
+          className="mb-8 block p-6 bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-2xl border border-purple-700/30 hover:border-purple-500/50 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-purple-500/20 rounded-xl">
+                <ClipboardCheck className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">
+                  🎁 プロフィール診断（特典）
+                </h3>
+                <p className="text-sm text-gray-400">20項目チェックでマッチング率UP</p>
+              </div>
+            </div>
+            <span className="text-purple-400 group-hover:translate-x-1 transition-transform">→</span>
+          </div>
+        </Link>
+        
         <div className="apple-card apple-glow p-10 sm:p-12 fade-in-up">
           <div className="flex items-center justify-between mb-12">
             <h2 className="text-5xl sm:text-6xl font-bold text-white tracking-tight gradient-text">
@@ -569,36 +658,14 @@ export default function Home() {
           {error && (
             <div className="mb-8 p-6 bg-red-900/30 border border-red-800/50 rounded-2xl text-red-300">
               <p className="mb-4 text-lg">{error}</p>
-              {!user?.isSubscribed && !isDevMode && (
+              {usageInfo && usageInfo.remaining === 0 && !isDevMode && (
                 <button
-                  onClick={() => router.push('/subscribe')}
-                  className="apple-button-primary"
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full text-sm hover:from-blue-400 hover:to-purple-400 transition-all"
                 >
-                  会員登録ページへ →
+                  アップグレードして制限を解除
                 </button>
               )}
-            </div>
-          )}
-
-          {!user?.isSubscribed && !isDevMode && !error && (
-            <div className="mb-8 p-8 bg-blue-900/20 border border-blue-800/30 rounded-2xl">
-              <div className="flex items-start">
-                <Crown className="w-7 h-7 text-blue-400 mr-4 mt-1 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="text-2xl font-semibold text-white mb-3">
-                    AI返信生成機能を使えます
-                  </h3>
-                  <p className="text-gray-300 mb-6 text-lg">
-                    月額または年額プランに登録すると、AI返信生成機能を使えます。
-                  </p>
-                  <button
-                    onClick={() => router.push('/subscribe')}
-                    className="apple-button-primary"
-                  >
-                    会員登録ページへ →
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -743,14 +810,14 @@ export default function Home() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  disabled={(!user?.isSubscribed && !isDevMode) || isExtracting}
+                  disabled={(!user && !isDevMode) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                   className="hidden"
                   id="image-upload"
                 />
                 <label
                   htmlFor="image-upload"
                   className={`inline-flex items-center px-6 py-3.5 border rounded-full cursor-pointer transition-all duration-300 font-medium ${
-                    (!user?.isSubscribed && !isDevMode) || isExtracting
+                    (!user && !isDevMode) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)
                       ? 'bg-gray-900 text-gray-500 cursor-not-allowed border-gray-800'
                       : 'bg-gray-900/50 text-gray-200 hover:bg-gray-800/70 border-gray-700 hover:border-gray-600 active:scale-95'
                   }`}
@@ -805,12 +872,12 @@ export default function Home() {
                   placeholder="例: おはよう！今日は何してる？"
                   className="apple-tv-input w-full px-6 py-4 pr-14 text-white rounded-2xl resize-none placeholder:text-gray-500 text-lg"
                   rows={5}
-                  disabled={(!user?.isSubscribed && !isDevMode) || isLoading}
+                  disabled={(!user && !isDevMode) || isLoading || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                 />
                 <button
                   type="button"
                   onClick={isListening ? handleStopListening : handleStartListening}
-                  disabled={(!user?.isSubscribed && !isDevMode) || isLoading || !isSpeechSupported}
+                  disabled={(!user && !isDevMode) || isLoading || !isSpeechSupported || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                   className={`absolute right-4 top-4 p-3 rounded-full transition-all duration-300 ${
                     isListening
                       ? 'bg-red-500 text-white hover:bg-red-400'
@@ -856,21 +923,33 @@ export default function Home() {
                 </div>
               )}
               {usageInfo && !isDevMode && usageInfo.remaining === 0 && (
-                <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-xl text-red-300">
-                  <p className="text-sm font-medium mb-2">
-                    ❌ 1日の使用回数制限（{usageInfo.limit}回）に達しました。明日またお試しください。
-                  </p>
-                  <button
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="text-xs underline hover:no-underline text-red-400"
-                  >
-                    追加課金で使用回数を増やす
-                  </button>
+                <div className="p-5 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl">
+                  <div className="flex items-start">
+                    <Zap className="w-6 h-6 text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-white font-bold mb-1">
+                        今日の無料アドバイスを使い切りました
+                      </p>
+                      <p className="text-sm text-gray-400 mb-3">
+                        {usageInfo.limit === 3 ? (
+                          <>プロプランにアップグレードすると、1日50回まで使えます</>
+                        ) : (
+                          <>明日またお試しいただくか、プランをアップグレードしてください</>
+                        )}
+                      </p>
+                      <button
+                        onClick={() => setShowUpgradeModal(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full text-sm hover:from-blue-400 hover:to-purple-400 transition-all active:scale-95"
+                      >
+                        アップグレードする
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
               <button
                 onClick={handleGenerate}
-                disabled={(!user?.isSubscribed && !isDevMode) || isLoading || !herMessage.trim() || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
+                disabled={(!user && !isDevMode) || isLoading || !herMessage.trim() || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                 className="w-full apple-button-primary flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -947,19 +1026,35 @@ export default function Home() {
                         >
                           コピー
                         </button>
-                        <button
-                          onClick={() => {
-                            const feedback = { response: aiResponse, rating: 'good', timestamp: Date.now() };
-                            const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
-                            savedFeedback.push(feedback);
-                            localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
-                            alert('評価を保存しました');
-                          }}
-                          className="px-3 py-2 bg-green-900/30 border border-green-800/50 text-green-300 rounded-full hover:bg-green-900/40 transition-all active:scale-95"
-                          title="この返信が良かった"
-                        >
-                          <ThumbsUp className="w-4 h-4" />
-                        </button>
+                          <button
+                            onClick={async () => {
+                              const feedback = { response: aiResponse, rating: 'good', timestamp: Date.now() };
+                              const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
+                              savedFeedback.push(feedback);
+                              localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
+                              
+                              // 成功を記録（バッジ獲得のため）
+                              if (token && !isDevMode) {
+                                try {
+                                  const result = await recordSuccess(token);
+                                  if (result.newBadges && result.newBadges.length > 0) {
+                                    alert(`🎉 新しいバッジを獲得しました！\n${result.newBadgeDetails.map(b => b.name).join(', ')}`);
+                                  } else {
+                                    alert('評価を保存しました！成功率: ' + result.successRate + '%');
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to record success:', err);
+                                  alert('評価を保存しました');
+                                }
+                              } else {
+                                alert('評価を保存しました');
+                              }
+                            }}
+                            className="px-3 py-2 bg-green-900/30 border border-green-800/50 text-green-300 rounded-full hover:bg-green-900/40 transition-all active:scale-95"
+                            title="この返信が良かった"
+                          >
+                            <ThumbsUp className="w-4 h-4" />
+                          </button>
                         <button
                           onClick={() => {
                             const feedback = { response: aiResponse, rating: 'bad', timestamp: Date.now() };

@@ -71,11 +71,42 @@ export interface UsageInfo {
   remaining: number;
 }
 
+export interface StreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate?: string;
+  isActiveToday?: boolean;
+  willExpireSoon?: boolean;
+}
+
+export interface UserStats {
+  totalUsageCount: number;
+  successCount: number;
+  successRate: number;
+  level: number;
+  levelName: string;
+  badges: string[];
+  currentStreak: number;
+  longestStreak: number;
+  subscriptionType: string;
+  dailyUsageLimit: number;
+  todayUsageCount: number;
+  todayRemaining: number;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface AIResponse {
   response: string;
   explanation: string;
   alternatives?: AlternativeResponse[]; // 代替返信候補（それぞれに解説付き）
   usageInfo?: UsageInfo; // 使用回数情報
+  streakInfo?: StreakInfo; // ストリーク情報
+  userStats?: Partial<UserStats>; // ユーザー統計情報
 }
 
 export async function generateAIResponse(
@@ -172,24 +203,140 @@ export async function extractTextFromImage(
     headers.Authorization = `Bearer ${token}`;
   }
   
-  const response = await fetch('/api/extract-text', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ image: imageBase64 }),
-  });
+  try {
+    const response = await fetch('/api/extract-text', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ image: imageBase64 }),
+    });
 
-  const data = await response.json();
+    // レスポンスがJSONかどうかを確認
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      // JSONではない場合（サーバーエラーなど）
+      const text = await response.text();
+      console.error('Non-JSON response:', text);
+      
+      // よくあるエラーパターンをチェック
+      if (text.includes('Request Entity Too Large') || text.includes('413')) {
+        return {
+          extractedText: '',
+          message: '',
+          error: '画像サイズが大きすぎます。\n\n小さい画像を選択するか、画像の一部をトリミングしてお試しください。',
+        };
+      }
+      
+      return {
+        extractedText: '',
+        message: '',
+        error: 'サーバーエラーが発生しました。しばらく待ってから再度お試しください。',
+      };
+    }
 
-  if (!response.ok) {
-    // エラーレスポンスでもデータを返す（エラーメッセージを含む）
+    const data = await response.json();
+
+    if (!response.ok) {
+      // エラーレスポンスでもデータを返す（エラーメッセージを含む）
+      return {
+        extractedText: data.extractedText || '',
+        message: data.message || '',
+        error: data.error || 'テキストの抽出に失敗しました',
+      };
+    }
+
+    return data;
+  } catch (err) {
+    console.error('extractTextFromImage error:', err);
+    
+    // JSONパースエラーの場合
+    if (err instanceof SyntaxError) {
+      return {
+        extractedText: '',
+        message: '',
+        error: '画像サイズが大きすぎる可能性があります。\n\n小さい画像を選択するか、画像の一部をトリミングしてお試しください。',
+      };
+    }
+    
     return {
-      extractedText: data.extractedText || '',
-      message: data.message || '',
-      error: data.error || 'テキストの抽出に失敗しました',
+      extractedText: '',
+      message: '',
+      error: err instanceof Error ? err.message : 'テキストの抽出に失敗しました',
     };
   }
+}
 
-  return data;
+// ストリーク情報を取得
+export async function getStreakInfo(token: string): Promise<StreakInfo> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true') {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const response = await fetch('/api/streak', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'ストリーク情報の取得に失敗しました');
+  }
+
+  return response.json();
+}
+
+// ユーザー統計情報を取得
+export async function getUserStats(token: string): Promise<UserStats & { badgeDetails: Badge[] }> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true') {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const response = await fetch('/api/stats', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || '統計情報の取得に失敗しました');
+  }
+
+  return response.json();
+}
+
+// 成功を記録（ユーザーが「良かった」評価をした時）
+export async function recordSuccess(token: string): Promise<{
+  successCount: number;
+  successRate: number;
+  newBadges: string[];
+  newBadgeDetails: Badge[];
+}> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true') {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const response = await fetch('/api/stats', {
+    method: 'POST',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || '成功の記録に失敗しました');
+  }
+
+  return response.json();
 }
 
 

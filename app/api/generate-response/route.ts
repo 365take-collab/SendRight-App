@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount } from '@/lib/auth';
+import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage, BADGES, PLAN_LIMITS } from '@/lib/auth';
 import { generateResponse } from '@/lib/ai';
 import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, checkIPWhitelist, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
 import { z } from 'zod';
@@ -94,11 +94,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check subscription
-      const hasActiveSubscription = checkSubscription(user);
-      if (!hasActiveSubscription) {
+      // Check subscription (無料プランでも使用可能、制限付き)
+      // 無料プランは1日3回まで、有料プランは制限に応じて使用可能
+      const planType = user.subscriptionType || 'free';
+      const isPaidPlan = user.isSubscribed || (planType !== 'free');
+      
+      // 有料プランで期限切れの場合のみエラー
+      if (isPaidPlan && !checkSubscription(user)) {
         return NextResponse.json(
-          { error: 'この機能を使用するには有効なサブスクリプションが必要です' },
+          { error: 'サブスクリプションの有効期限が切れています。更新してください。' },
           { status: 403 }
         );
       }
@@ -152,6 +156,18 @@ export async function POST(request: NextRequest) {
       // 使用回数を事前にカウント（AI生成前に）
       // これにより、コピー&ペーストや開発者ツールでの直接呼び出しでも確実にカウントされる
       incrementUsageCount(user.id);
+      
+      // ストリークを更新
+      const streakResult = updateStreak(user.id);
+      
+      // 統計を記録（総使用回数、レベル、バッジ）
+      const usageResult = recordUsage(user.id);
+      
+      // 新しいバッジがあればログに記録
+      const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
+      if (allNewBadges.length > 0) {
+        console.log(`User ${user.id} earned new badges:`, allNewBadges);
+      }
     }
 
     // リクエストボディを取得（署名検証のため、文字列として保持）
@@ -188,6 +204,9 @@ export async function POST(request: NextRequest) {
     // Generate AI response
     let result;
     let usageInfo = null;
+    let streakInfo = null;
+    let newBadges: string[] = [];
+    let userStats = null;
     
     try {
       result = await generateResponse({
@@ -197,7 +216,7 @@ export async function POST(request: NextRequest) {
         profileContext, // 前提情報を渡す
       });
 
-      // 使用回数情報を取得（開発環境ではスキップ）
+      // 使用回数情報・ストリーク・統計を取得（開発環境ではスキップ）
       if (!isDevMode) {
         const authHeader = request.headers.get('authorization');
         if (authHeader?.startsWith('Bearer ')) {
@@ -207,6 +226,19 @@ export async function POST(request: NextRequest) {
             const user = await findUserById(decoded.userId);
             if (user) {
               usageInfo = getUsageInfo(user.id);
+              
+              // ストリーク情報
+              streakInfo = {
+                currentStreak: user.currentStreak || 0,
+                longestStreak: user.longestStreak || 0,
+              };
+              
+              // ユーザー統計
+              userStats = {
+                totalUsageCount: user.totalUsageCount || 0,
+                level: user.level || 1,
+                badges: user.badges || [],
+              };
             }
           }
         }
@@ -241,6 +273,8 @@ export async function POST(request: NextRequest) {
       explanation: result.explanation,
       alternatives: result.alternatives,
       usageInfo, // 使用回数情報を返す
+      streakInfo, // ストリーク情報を返す
+      userStats, // ユーザー統計情報を返す
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
