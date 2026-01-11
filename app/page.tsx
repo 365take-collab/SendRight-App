@@ -550,10 +550,10 @@ export default function Home() {
             
             {/* Utageへのリンク */}
             <a
-              href="https://utage-system.com/p/ULFGjACTfQ7m"
+              href="https://utage-system.com/members/prUSVju86L5m/home"
               className="inline-flex items-center justify-center w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all"
             >
-              会員サイトへ
+              会員サイトでログイン
               <span className="ml-2">→</span>
             </a>
             
