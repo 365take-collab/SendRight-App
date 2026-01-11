@@ -17,18 +17,22 @@ function UtageLoginContent() {
 
     console.log('ログインページ - パラメータ確認:', { email });
 
-    // メールアドレスがない、または%mail%のままの場合は入力フォームを表示
+    // メールアドレスがない、または%mail%のままの場合
     if (!email || email === '%mail%' || email.includes('%')) {
-      console.log('メールアドレスが無効なため、入力フォームを表示');
-      setStatus('input');
+      console.log('メールアドレスが無効 - Utageからのアクセスとして処理');
+      
+      // Utageからのアクセスフラグを設定してメインページにリダイレクト
+      sessionStorage.setItem('utage_access', 'true');
+      window.location.href = '/?utage_embed=true';
       return;
     }
 
     // メールアドレスの形式をチェック
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('メールアドレス形式が無効なため、入力フォームを表示');
-      setStatus('input');
+      console.log('メールアドレス形式が無効 - Utageからのアクセスとして処理');
+      sessionStorage.setItem('utage_access', 'true');
+      window.location.href = '/?utage_embed=true';
       return;
     }
 
