@@ -39,9 +39,40 @@ export default function Home() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+  const [isEmbedMode, setIsEmbedMode] = useState(false);
 
 
   useEffect(() => {
+    // 埋め込みモードとメールアドレスをURLパラメータから検出
+    const urlParams = new URLSearchParams(window.location.search);
+    const embedMode = urlParams.get('utage_embed') === 'true';
+    const emailFromUrl = urlParams.get('email');
+    
+    if (embedMode) {
+      setIsEmbedMode(true);
+      // 埋め込みモードの場合、Utageアクセスフラグを設定
+      sessionStorage.setItem('utage_access', 'true');
+      
+      // メールアドレスが有効な場合、自動ログイン
+      if (emailFromUrl && emailFromUrl !== '%mail%' && !emailFromUrl.includes('%')) {
+        // メールアドレスを使って自動ログイン処理
+        fetch('/api/auth/utage-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailFromUrl }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.token) {
+              localStorage.setItem('token', data.token);
+              setToken(data.token);
+              sessionStorage.setItem('utage_access', 'true');
+            }
+          })
+          .catch(err => console.error('Auto login error:', err));
+      }
+    }
+
     // ローカルストレージから前提情報を読み込む
     const savedProfileInfo = localStorage.getItem('profileInfo');
     if (savedProfileInfo) {
@@ -610,6 +641,8 @@ export default function Home() {
       </div>
       
       <div className="relative z-10">
+      {/* 埋め込みモードでない場合のみフルヘッダーを表示 */}
+      {!isEmbedMode ? (
       <nav className="glass-effect border-b border-gray-900/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex justify-between items-center h-20">
@@ -678,8 +711,27 @@ export default function Home() {
           </div>
         </div>
       </nav>
+      ) : (
+        /* 埋め込みモード用のシンプルヘッダー */
+        <div className="py-4 px-6 border-b border-gray-800/50">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
+            <div className="flex items-center space-x-3">
+              <img 
+                src="/sendright-logo.svg" 
+                alt="SendRight" 
+                className="h-8 w-auto"
+              />
+            </div>
+            {usageInfo && (
+              <span className="text-sm text-gray-400">
+                残り{usageInfo.remaining}回
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
-      <main className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 py-20">
+      <main className={`max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 ${isEmbedMode ? 'py-8' : 'py-20'}`}>
         <OnboardingModal />
         
         {/* ダッシュボード（ストリーク・統計表示） */}
