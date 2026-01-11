@@ -519,6 +519,59 @@ export default function Home() {
     );
   }
 
+  // ログインしていない場合、Utageへの誘導ページを表示
+  if (!user && !isDevMode) {
+    return (
+      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
+        {/* 背景 */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-black via-purple-950/20 to-black pointer-events-none"></div>
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/8 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/8 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div className="relative z-10 max-w-lg mx-auto px-6 text-center">
+          {/* ロゴ */}
+          <div className="mb-8">
+            <img 
+              src="/sendright-logo.svg" 
+              alt="SendRight" 
+              className="h-16 w-auto mx-auto"
+            />
+          </div>
+          
+          {/* メッセージ */}
+          <div className="bg-gradient-to-br from-gray-900/90 to-gray-950/90 rounded-3xl border border-gray-800/50 p-10">
+            <h1 className="text-3xl font-bold text-white mb-4">
+              SendRightへようこそ
+            </h1>
+            <p className="text-gray-400 mb-8 leading-relaxed">
+              SendRightをご利用いただくには、<br />
+              会員サイトからログインしてください。
+            </p>
+            
+            {/* Utageへのリンク */}
+            <a
+              href="https://utage-system.com/p/ULFGjACTfQ7m"
+              className="inline-flex items-center justify-center w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all"
+            >
+              会員サイトへ
+              <span className="ml-2">→</span>
+            </a>
+            
+            <p className="text-sm text-gray-500 mt-6">
+              まだ会員登録がお済みでない方は、<br />
+              会員サイトで無料登録できます。
+            </p>
+          </div>
+          
+          {/* フッター */}
+          <p className="text-xs text-gray-600 mt-8">
+            © 2024 SendRight. All rights reserved.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* 背景の微細なグラデーション効果 */}
