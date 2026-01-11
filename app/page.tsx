@@ -307,8 +307,13 @@ export default function Home() {
   };
 
   const handleLogout = () => {
+    // すべてのストレージをクリア
     localStorage.removeItem('token');
-    router.push('/auth/login-utage');
+    localStorage.removeItem('sendright_user');
+    sessionStorage.removeItem('utage_access');
+    setUser(null);
+    setToken(null);
+    // 注意: setUser(null)により、Utage誘導ページが表示される
   };
 
   const handleStartListening = async () => {
@@ -511,13 +516,22 @@ export default function Home() {
     alert('前提情報を保存しました');
   };
 
-  if (!user && !isDevMode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
-      </div>
-    );
-  }
+  // ログアウト処理（トークン無効時に自動呼び出し）
+  const handleAutoLogout = () => {
+    // すべてのストレージをクリア
+    localStorage.removeItem('token');
+    localStorage.removeItem('sendright_user');
+    sessionStorage.removeItem('utage_access');
+    setUser(null);
+    setToken(null);
+  };
+
+  // エラーが「無効なトークンです」の場合、自動ログアウト
+  useEffect(() => {
+    if (error === '無効なトークンです') {
+      handleAutoLogout();
+    }
+  }, [error]);
 
   // ログインしていない場合、Utageへの誘導ページを表示
   if (!user && !isDevMode) {
