@@ -43,12 +43,21 @@ export async function POST(request: NextRequest) {
       let user = null;
       
       if (isEmbedToken) {
-        // 埋め込みモード: ダミーユーザーを使用
+        // 埋め込みモード: ダミーユーザーを使用（Utage会員サイトで認証済み）
         user = {
           id: 'utage-embed-user',
           email: 'utage@example.com',
           isSubscribed: true,
-          subscriptionType: 'pro',
+          subscriptionType: 'pro' as const,
+          isUtageUser: true,
+          dailyUsageLimit: 50,
+          currentStreak: 0,
+          longestStreak: 0,
+          badges: [],
+          totalUsageCount: 0,
+          successCount: 0,
+          level: 1,
+          createdAt: new Date(),
         };
       } else {
         const decoded = verifyToken(token);
