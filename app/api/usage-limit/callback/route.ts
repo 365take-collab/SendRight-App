@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, updateDailyUsageLimit, getUsageInfo } from '@/lib/auth';
 
+// 動的ルートとして強制（searchParamsを使用するため）
+export const dynamic = 'force-dynamic';
+
 // Utageの決済完了後のコールバック
 // Utageの決済完了後、このURLにリダイレクトされる
 export async function GET(request: NextRequest) {
