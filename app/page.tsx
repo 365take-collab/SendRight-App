@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit } from '@/lib/api';
-import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, ClipboardCheck } from 'lucide-react';
+import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap } from 'lucide-react';
 import OnboardingModal from '@/app/components/OnboardingModal';
 import Dashboard from '@/app/components/Dashboard';
 import { recordSuccess } from '@/lib/api';
@@ -620,26 +620,7 @@ export default function Home() {
           <Dashboard token={token} isDevMode={isDevMode} />
         </div>
         
-        {/* プロフィール診断へのリンク */}
-        <Link
-          href="/profile-diagnosis"
-          className="mb-8 block p-6 bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-2xl border border-purple-700/30 hover:border-purple-500/50 transition-all group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-purple-500/20 rounded-xl">
-                <ClipboardCheck className="w-6 h-6 text-purple-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">
-                  🎁 プロフィール診断（特典）
-                </h3>
-                <p className="text-sm text-gray-400">20項目チェックでマッチング率UP</p>
-              </div>
-            </div>
-            <span className="text-purple-400 group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-        </Link>
+        {/* プロフィール診断へのリンクは削除（1回限りの特典としてメールで案内） */}
         
         <div className="apple-card apple-glow p-10 sm:p-12 fade-in-up">
           <div className="flex items-center justify-between mb-12">
