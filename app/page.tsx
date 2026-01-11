@@ -63,6 +63,9 @@ export default function Home() {
       });
       setToken('utage-embed-token');
       
+      // エラーをクリア（以前のエラーが残っている場合）
+      setError('');
+      
       // メールアドレスが有効な場合、自動ログインも試行
       if (emailFromUrl && emailFromUrl !== '%mail%' && !emailFromUrl.includes('%')) {
         fetch('/api/auth/utage-login', {
@@ -565,11 +568,12 @@ export default function Home() {
   };
 
   // エラーが「無効なトークンです」の場合、自動ログアウト
+  // ただし、埋め込みモードの場合はスキップ（Utageで認証済み）
   useEffect(() => {
-    if (error === '無効なトークンです') {
+    if (error === '無効なトークンです' && !isEmbedMode) {
       handleAutoLogout();
     }
-  }, [error]);
+  }, [error, isEmbedMode]);
 
   // ログインしていない場合、Utageへの誘導ページを表示
   // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
