@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Crown, Zap, Star, ArrowRight, Clock, Check, Gift } from 'lucide-react';
 
-export default function PurchaseComplete() {
+// useSearchParamsを使用するコンポーネントを分離
+function PurchaseCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15分 = 900秒
@@ -190,5 +191,23 @@ export default function PurchaseComplete() {
         }
       `}</style>
     </div>
+  );
+}
+
+// ローディング表示
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-white text-xl">読み込み中...</div>
+    </div>
+  );
+}
+
+// メインコンポーネント（Suspenseでラップ）
+export default function PurchaseComplete() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PurchaseCompleteContent />
+    </Suspense>
   );
 }

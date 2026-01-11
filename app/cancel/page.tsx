@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Flame, Trophy, Award, ArrowLeft, Gift, Clock, Heart, HelpCircle, Pause, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { getUserStats, UserStats, Badge } from '@/lib/api';
@@ -19,7 +19,7 @@ interface ReasonOption {
   };
 }
 
-export default function CancelPage() {
+function CancelPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<'reason' | 'stats' | 'offer' | 'confirm'>('reason');
@@ -438,5 +438,23 @@ export default function CancelPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+// ローディング表示
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-white text-xl">読み込み中...</div>
+    </div>
+  );
+}
+
+// メインコンポーネント（Suspenseでラップ）
+export default function CancelPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CancelPageContent />
+    </Suspense>
   );
 }
