@@ -17,8 +17,17 @@ function UtageLoginContent() {
 
     console.log('ログインページ - パラメータ確認:', { email });
 
-    if (!email) {
-      console.log('メールアドレスがURLにないため、入力フォームを表示');
+    // メールアドレスがない、または%mail%のままの場合は入力フォームを表示
+    if (!email || email === '%mail%' || email.includes('%')) {
+      console.log('メールアドレスが無効なため、入力フォームを表示');
+      setStatus('input');
+      return;
+    }
+
+    // メールアドレスの形式をチェック
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('メールアドレス形式が無効なため、入力フォームを表示');
       setStatus('input');
       return;
     }
