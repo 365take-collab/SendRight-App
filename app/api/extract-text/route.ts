@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
 
       // Utageユーザーチェックを削除（メールからのログインユーザーも許可）
       // サブスクリプションチェックのみ残す（有料ユーザーのみ使用可能）
-      }
 
       // Check subscription
       const hasActiveSubscription = checkSubscription(user);
