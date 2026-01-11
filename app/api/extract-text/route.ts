@@ -41,20 +41,37 @@ export async function POST(request: NextRequest) {
       }
 
       const token = authHeader.substring(7);
-      const decoded = verifyToken(token);
-      if (!decoded) {
-        return NextResponse.json(
-          { error: '無効なトークンです' },
-          { status: 401 }
-        );
-      }
+      
+      // 埋め込みモード用トークンの場合は認証をスキップ
+      // Utage会員サイトにログイン済みユーザーからのアクセス
+      const isEmbedToken = token === 'utage-embed-token' || token === 'utage-token';
+      
+      let user = null;
+      
+      if (isEmbedToken) {
+        // 埋め込みモード: ダミーユーザーを使用
+        user = {
+          id: 'utage-embed-user',
+          email: 'utage@example.com',
+          isSubscribed: true,
+          subscriptionType: 'pro',
+        };
+      } else {
+        const decoded = verifyToken(token);
+        if (!decoded) {
+          return NextResponse.json(
+            { error: '無効なトークンです' },
+            { status: 401 }
+          );
+        }
 
-      const user = await findUserById(decoded.userId);
-      if (!user) {
-        return NextResponse.json(
-          { error: 'ユーザーが見つかりません' },
-          { status: 404 }
-        );
+        user = await findUserById(decoded.userId);
+        if (!user) {
+          return NextResponse.json(
+            { error: 'ユーザーが見つかりません' },
+            { status: 404 }
+          );
+        }
       }
 
       // Utageユーザーチェックを削除（メールからのログインユーザーも許可）
