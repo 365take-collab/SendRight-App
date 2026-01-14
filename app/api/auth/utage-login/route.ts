@@ -275,52 +275,50 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Stripe顧客IDを取得
-    let stripeCustomerId = customerId;
-    let subscriptionStatus = { isActive: false };
-
-    // Utage経由のログイン（リファラーがUtageの場合）はStripeチェックをスキップ
-    // 決済はUtage側で完了しているため、ここでは認証のみ行う
-    const isUtageLogin = isFromUtage || isFromApp;
+    // ============================================
+    // 重要: Webhook経由で登録されたユーザーのみログイン可能
+    // ============================================
     
-    if (isDevelopment || isUtageLogin) {
-      // 開発環境またはUtage経由: サブスクリプション確認をスキップ
-      // Utageで決済完了しているユーザーは、Utage会員ページからアクセスしてくる
-      subscriptionStatus = { isActive: true };
-      // Utageユーザー用のIDを設定
-      if (!stripeCustomerId) {
-        stripeCustomerId = `utage_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      }
-      console.log('Utage login - skipping Stripe check:', maskEmail(email));
-    } else {
-      // 直接アクセス（Utage経由でない場合）: Stripeでサブスクリプション状態を確認
-      if (!stripeCustomerId) {
-        const customer = await getCustomerByEmail(email);
-        if (!customer) {
-          return NextResponse.json(
-            { error: 'Stripe customer not found' },
-            { status: 404 }
-          );
-        }
-        stripeCustomerId = customer.id;
-      }
-
-      // Stripeのサブスクリプション状態を確認
-      subscriptionStatus = await checkSubscriptionStatus(stripeCustomerId);
-      if (!subscriptionStatus.isActive) {
-        return NextResponse.json(
-          { error: 'Subscription is not active' },
-          { status: 403 }
-        );
-      }
+    // まず、既存ユーザーを検索
+    const { findUserByEmail } = await import('@/lib/auth');
+    const existingUser = await findUserByEmail(email);
+    
+    // ユーザーが存在しない場合 → ログイン拒否
+    if (!existingUser) {
+      console.warn('ログイン拒否: ユーザーが存在しません', { email: maskEmail(email) });
+      return NextResponse.json(
+        { error: isDevelopment ? 'User not found. Please purchase first.' : 'Authentication failed' },
+        { status: 403 }
+      );
     }
-
-    // ユーザーを作成または更新
-    const user = await createOrUpdateUserFromUtage(
-      email,
-      stripeCustomerId,
-      subscriptionStatus.isActive
-    );
+    
+    // ユーザーが存在するが、Utage経由で登録されていない場合 → ログイン拒否
+    if (!existingUser.isUtageUser) {
+      console.warn('ログイン拒否: Utage経由で登録されていません', { email: maskEmail(email), isUtageUser: existingUser.isUtageUser });
+      return NextResponse.json(
+        { error: isDevelopment ? 'User not registered via Utage. Please purchase first.' : 'Authentication failed' },
+        { status: 403 }
+      );
+    }
+    
+    // サブスクリプションが有効でない場合 → ログイン拒否
+    if (!existingUser.isSubscribed) {
+      console.warn('ログイン拒否: サブスクリプションが無効です', { email: maskEmail(email), isSubscribed: existingUser.isSubscribed });
+      return NextResponse.json(
+        { error: isDevelopment ? 'Subscription is not active. Please renew.' : 'Authentication failed' },
+        { status: 403 }
+      );
+    }
+    
+    console.log('ログイン許可: Webhook経由で登録済みのユーザー', {
+      email: maskEmail(email),
+      userId: existingUser.id,
+      isUtageUser: existingUser.isUtageUser,
+      isSubscribed: existingUser.isSubscribed,
+    });
+    
+    // 既存ユーザーを使用
+    const user = existingUser;
 
     // トークンを生成
     const authToken = generateToken(user.id);

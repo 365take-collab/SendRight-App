@@ -1,64 +1,58 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import * as db from './supabase';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// ========================================
+// 型定義（後方互換性のため維持）
+// ========================================
 
 export interface User {
   id: string;
   email: string;
-  passwordHash?: string; // Utage連携の場合はパスワードなし
+  passwordHash?: string;
   isSubscribed: boolean;
   subscriptionExpiresAt?: Date;
-  stripeCustomerId?: string; // Stripe顧客ID
-  isUtageUser: boolean; // Utageからのログインで作成されたユーザーかどうか
-  dailyUsageLimit: number; // 1日の使用回数制限（デフォルト50、追加課金で増やせる）
-  subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly'; // サブスクリプションの種別
-  // ストリーク関連
-  currentStreak: number; // 現在の連続使用日数
-  longestStreak: number; // 過去最長の連続使用日数
-  lastActiveDate?: string; // 最後にアクティブだった日付（YYYY-MM-DD）
-  // バッジ関連
-  badges: string[]; // 獲得済みバッジのIDリスト
-  // 統計関連
-  totalUsageCount: number; // 総使用回数
-  successCount: number; // 成功した返信の数（ユーザーが「良かった」と評価した数）
-  level: number; // ユーザーレベル
+  stripeCustomerId?: string;
+  isUtageUser: boolean;
+  dailyUsageLimit: number;
+  subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly';
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate?: string;
+  badges: string[];
+  totalUsageCount: number;
+  successCount: number;
+  level: number;
   createdAt: Date;
 }
 
 export interface UsageRecord {
   userId: string;
-  date: string; // YYYY-MM-DD形式
+  date: string;
   count: number;
 }
 
-// In-memory database (replace with real database in production)
-let users: User[] = [];
-let usageRecords: UsageRecord[] = [];
-
-// ==============================================
-// プラン別の使用回数制限（フリーミアムモデル）
-// ==============================================
-// 無料プラン: 1日3回（永久無料、価値を体験させる）
-// ベーシック: 1日10回（月額3,980円）
-// プロ: 1日50回（月額6,980円、現行プラン）
-// プレミアム: 無制限（月額14,800円）
+// ========================================
+// プラン設定
+// ========================================
 
 export const PLAN_LIMITS = {
-  free: 3,        // 無料プラン: 1日3回
-  basic: 10,      // ベーシック: 1日10回
-  pro: 50,        // プロ: 1日50回（現行のデフォルト）
-  premium: 9999,  // プレミアム: 実質無制限
-  // 後方互換性のため
-  monthly: 50,    // 月額プラン（プロ相当）
-  yearly: 50,     // 年額プラン（プロ相当）
+  free: 3,
+  basic: 10,
+  pro: 50,
+  premium: 9999,
+  monthly: 50,
+  yearly: 50,
 } as const;
 
-export const DEFAULT_DAILY_USAGE_LIMIT = PLAN_LIMITS.free; // 無料プランがデフォルト
+export const DEFAULT_DAILY_USAGE_LIMIT = PLAN_LIMITS.pro; // 課金ユーザーのみなのでproがデフォルト
 
-// ==============================================
+// ========================================
 // バッジ定義
-// ==============================================
+// ========================================
+
 export const BADGES = {
   FIRST_USE: { id: 'first_use', name: '🎯 初使用', description: '初めてAIアドバイスを使った' },
   STREAK_3: { id: 'streak_3', name: '🔥 3日連続', description: '3日連続で使用' },
@@ -73,7 +67,10 @@ export const BADGES = {
   FIRST_SUCCESS: { id: 'first_success', name: '🎉 初成功', description: '初めて「良かった」評価をした' },
 } as const;
 
-// レベル計算（総使用回数に基づく）
+// ========================================
+// ヘルパー関数
+// ========================================
+
 export function calculateLevel(totalUsageCount: number): number {
   if (totalUsageCount >= 1000) return 10;
   if (totalUsageCount >= 500) return 9;
@@ -87,23 +84,45 @@ export function calculateLevel(totalUsageCount: number): number {
   return 1;
 }
 
-// レベル名を取得
 export function getLevelName(level: number): string {
-  const names = [
-    '', // 0は使わない
-    '初心者',
-    'ルーキー',
-    'アマチュア',
-    'セミプロ',
-    'プロ',
-    'エキスパート',
-    'マスター',
-    'グランドマスター',
-    'レジェンド',
-    '神',
-  ];
+  const names = ['', '初心者', 'ルーキー', 'アマチュア', 'セミプロ', 'プロ', 'エキスパート', 'マスター', 'グランドマスター', 'レジェンド', '神'];
   return names[level] || '神';
 }
+
+function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getYesterdayDateString(): string {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday.toISOString().split('T')[0];
+}
+
+// DbUser → User 変換
+function dbUserToUser(dbUser: db.DbUser): User {
+  return {
+    id: dbUser.id,
+    email: dbUser.email,
+    isSubscribed: dbUser.is_subscribed,
+    stripeCustomerId: dbUser.stripe_customer_id || undefined,
+    isUtageUser: dbUser.is_utage_user,
+    dailyUsageLimit: dbUser.daily_usage_limit,
+    subscriptionType: dbUser.subscription_type as User['subscriptionType'],
+    currentStreak: dbUser.current_streak,
+    longestStreak: dbUser.longest_streak,
+    lastActiveDate: dbUser.last_active_date || undefined,
+    badges: dbUser.badges,
+    totalUsageCount: dbUser.total_usage_count,
+    successCount: dbUser.success_count,
+    level: dbUser.level,
+    createdAt: new Date(dbUser.created_at),
+  };
+}
+
+// ========================================
+// 認証関連
+// ========================================
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -119,37 +138,38 @@ export function generateToken(userId: string): string {
 
 export function verifyToken(token: string): { userId: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    return decoded;
+    return jwt.verify(token, JWT_SECRET) as { userId: string };
   } catch {
     return null;
   }
 }
 
+// ========================================
+// ユーザー関連（Supabase版）
+// ========================================
+
 export async function createUser(email: string, password?: string): Promise<User> {
   const passwordHash = password ? await hashPassword(password) : undefined;
-  const user: User = {
-    id: Date.now().toString(),
+  
+  const dbUser = await db.createUser({
     email,
-    passwordHash,
-    isSubscribed: false,
-    isUtageUser: false, // 通常のログインで作成されたユーザー
-    dailyUsageLimit: DEFAULT_DAILY_USAGE_LIMIT, // 無料プランがデフォルト
-    subscriptionType: 'free', // 無料プランから開始
-    // ストリーク関連の初期化
-    currentStreak: 0,
-    longestStreak: 0,
-    lastActiveDate: undefined,
-    // バッジ関連
+    is_subscribed: false,
+    is_utage_user: false,
+    daily_usage_limit: DEFAULT_DAILY_USAGE_LIMIT,
+    subscription_type: 'free',
+    current_streak: 0,
+    longest_streak: 0,
     badges: [],
-    // 統計関連
-    totalUsageCount: 0,
-    successCount: 0,
+    total_usage_count: 0,
+    success_count: 0,
     level: 1,
-    createdAt: new Date(),
-  };
-  users.push(user);
-  return user;
+  });
+
+  if (!dbUser) {
+    throw new Error('Failed to create user');
+  }
+
+  return dbUserToUser(dbUser);
 }
 
 export async function createOrUpdateUserFromUtage(
@@ -158,73 +178,55 @@ export async function createOrUpdateUserFromUtage(
   isSubscribed: boolean = true,
   subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly'
 ): Promise<User> {
-  // 既存ユーザーを検索
-  let user = users.find(u => u.email === email);
-  
-  // プランに応じた使用回数制限を設定
   const planType = subscriptionType || (isSubscribed ? 'pro' : 'free');
   const usageLimit = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.pro;
-  
-  if (user) {
-    // 既存ユーザーの情報を更新
-    user.stripeCustomerId = stripeCustomerId;
-    user.isSubscribed = isSubscribed;
-    user.isUtageUser = true; // Utageユーザーとしてマーク
-    user.subscriptionType = planType;
-    user.dailyUsageLimit = usageLimit;
-    
-    // ストリーク・統計関連のプロパティがない場合は初期化（後方互換性）
-    if (user.currentStreak === undefined) user.currentStreak = 0;
-    if (user.longestStreak === undefined) user.longestStreak = 0;
-    if (user.badges === undefined) user.badges = [];
-    if (user.totalUsageCount === undefined) user.totalUsageCount = 0;
-    if (user.successCount === undefined) user.successCount = 0;
-    if (user.level === undefined) user.level = 1;
-    
-    return user;
+
+  // 既存ユーザーを検索
+  const existingUser = await db.findUserByEmail(email);
+
+  if (existingUser) {
+    // 既存ユーザーを更新
+    const updated = await db.updateUser(existingUser.id, {
+      stripe_customer_id: stripeCustomerId,
+      is_subscribed: isSubscribed,
+      is_utage_user: true,
+      subscription_type: planType,
+      daily_usage_limit: usageLimit,
+    });
+    return dbUserToUser(updated || existingUser);
   } else {
     // 新規ユーザーを作成
-    const newUser: User = {
-      id: Date.now().toString(),
+    const newUser = await db.createUser({
       email,
-      isSubscribed,
-      stripeCustomerId,
-      isUtageUser: true, // Utageからのログインで作成されたユーザー
-      dailyUsageLimit: usageLimit,
-      subscriptionType: planType,
-      // ストリーク関連の初期化
-      currentStreak: 0,
-      longestStreak: 0,
-      lastActiveDate: undefined,
-      // バッジ関連
+      stripe_customer_id: stripeCustomerId,
+      is_subscribed: isSubscribed,
+      is_utage_user: true,
+      subscription_type: planType,
+      daily_usage_limit: usageLimit,
+      current_streak: 0,
+      longest_streak: 0,
       badges: [],
-      // 統計関連
-      totalUsageCount: 0,
-      successCount: 0,
+      total_usage_count: 0,
+      success_count: 0,
       level: 1,
-      createdAt: new Date(),
-    };
-    users.push(newUser);
-    return newUser;
+    });
+
+    if (!newUser) {
+      throw new Error('Failed to create user');
+    }
+
+    return dbUserToUser(newUser);
   }
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  const user = users.find(u => u.email === email);
-  // 既存ユーザーにisUtageUserプロパティがない場合は、デフォルトでfalseを設定（後方互換性のため）
-  if (user && !('isUtageUser' in user)) {
-    (user as any).isUtageUser = false;
-  }
-  return user;
+  const dbUser = await db.findUserByEmail(email);
+  return dbUser ? dbUserToUser(dbUser) : undefined;
 }
 
 export async function findUserById(id: string): Promise<User | undefined> {
-  const user = users.find(u => u.id === id);
-  // 既存ユーザーにisUtageUserプロパティがない場合は、デフォルトでfalseを設定（後方互換性のため）
-  if (user && !('isUtageUser' in user)) {
-    (user as any).isUtageUser = false;
-  }
-  return user;
+  const dbUser = await db.findUserById(id);
+  return dbUser ? dbUserToUser(dbUser) : undefined;
 }
 
 export async function updateUserSubscription(
@@ -232,11 +234,9 @@ export async function updateUserSubscription(
   isSubscribed: boolean,
   expiresAt?: Date
 ): Promise<void> {
-  const user = users.find(u => u.id === userId);
-  if (user) {
-    user.isSubscribed = isSubscribed;
-    user.subscriptionExpiresAt = expiresAt;
-  }
+  await db.updateUser(userId, {
+    is_subscribed: isSubscribed,
+  });
 }
 
 export function checkSubscription(user: User): boolean {
@@ -247,295 +247,230 @@ export function checkSubscription(user: User): boolean {
   return true;
 }
 
-// 今日の日付を取得（YYYY-MM-DD形式）
-function getTodayDateString(): string {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+// ========================================
+// 使用回数関連（Supabase版）
+// ========================================
+
+export async function getTodayUsageCount(userId: string): Promise<number> {
+  return db.getTodayUsageCount(userId);
 }
 
-// ユーザーの今日の使用回数を取得
-export function getTodayUsageCount(userId: string): number {
-  const today = getTodayDateString();
-  const record = usageRecords.find(r => r.userId === userId && r.date === today);
-  return record ? record.count : 0;
+export async function incrementUsageCount(userId: string): Promise<number> {
+  return db.incrementUsageCount(userId);
 }
 
-// ユーザーの使用回数を増やす
-export function incrementUsageCount(userId: string): number {
-  const today = getTodayDateString();
-  let record = usageRecords.find(r => r.userId === userId && r.date === today);
-  
-  if (!record) {
-    record = {
-      userId,
-      date: today,
-      count: 0,
-    };
-    usageRecords.push(record);
-  }
-  
-  record.count++;
-  return record.count;
+export async function canUseService(userId: string): Promise<{ canUse: boolean; remaining: number; limit: number }> {
+  return db.canUseService(userId);
 }
 
-// ユーザーが使用可能かチェック（ユーザーごとの制限を考慮）
-export function canUseService(userId: string): { canUse: boolean; remaining: number; limit: number } {
-  const user = users.find(u => u.id === userId);
-  const userLimit = user?.dailyUsageLimit || DEFAULT_DAILY_USAGE_LIMIT;
-  const todayCount = getTodayUsageCount(userId);
-  const remaining = Math.max(0, userLimit - todayCount);
-  const canUse = todayCount < userLimit;
-  
-  return {
-    canUse,
-    remaining,
-    limit: userLimit,
-  };
+export async function getUsageInfo(userId: string): Promise<{ todayCount: number; limit: number; remaining: number }> {
+  return db.getUsageInfo(userId);
 }
 
-// 使用回数情報を取得
-export function getUsageInfo(userId: string): { todayCount: number; limit: number; remaining: number } {
-  const user = users.find(u => u.id === userId);
-  const userLimit = user?.dailyUsageLimit || DEFAULT_DAILY_USAGE_LIMIT;
-  const todayCount = getTodayUsageCount(userId);
-  const remaining = Math.max(0, userLimit - todayCount);
-  
-  return {
-    todayCount,
-    limit: userLimit,
-    remaining,
-  };
+export async function updateDailyUsageLimit(userId: string, newLimit: number): Promise<boolean> {
+  const result = await db.updateUser(userId, { daily_usage_limit: newLimit });
+  return !!result;
 }
 
-// ユーザーの使用回数制限を更新（追加課金で増やす）
-export function updateDailyUsageLimit(userId: string, newLimit: number): boolean {
-  const user = users.find(u => u.id === userId);
-  if (!user) {
-    return false;
-  }
-  user.dailyUsageLimit = newLimit;
-  return true;
+export async function decrementUsageCount(userId: string): Promise<void> {
+  // Supabase版では実装省略（必要に応じて追加）
+  console.warn('decrementUsageCount is not implemented for Supabase');
 }
 
-// 使用回数を減らす（ロールバック用）
-export function decrementUsageCount(userId: string): void {
-  const today = getTodayDateString();
-  const record = usageRecords.find(r => r.userId === userId && r.date === today);
-  if (record && record.count > 0) {
-    record.count--;
-  }
-}
+// ========================================
+// ストリーク関連（Supabase版）
+// ========================================
 
-// ==============================================
-// ストリーク関連の関数
-// ==============================================
-
-// ストリークを更新（使用時に呼び出す）
-export function updateStreak(userId: string): { 
-  currentStreak: number; 
-  longestStreak: number; 
+export async function updateStreak(userId: string): Promise<{
+  currentStreak: number;
+  longestStreak: number;
   newBadges: string[];
   streakContinued: boolean;
-} {
-  const user = users.find(u => u.id === userId);
+}> {
+  const user = await db.findUserById(userId);
   if (!user) {
     return { currentStreak: 0, longestStreak: 0, newBadges: [], streakContinued: false };
   }
-  
+
   const today = getTodayDateString();
   const yesterday = getYesterdayDateString();
   const newBadges: string[] = [];
   let streakContinued = false;
-  
-  // 今日既にアクティブな場合は何もしない
-  if (user.lastActiveDate === today) {
-    return { 
-      currentStreak: user.currentStreak, 
-      longestStreak: user.longestStreak, 
+  let newStreak = user.current_streak;
+
+  if (user.last_active_date === today) {
+    return {
+      currentStreak: user.current_streak,
+      longestStreak: user.longest_streak,
       newBadges: [],
-      streakContinued: true 
+      streakContinued: true,
     };
   }
-  
-  // ストリークの更新
-  if (user.lastActiveDate === yesterday) {
-    // 昨日もアクティブだった → ストリーク継続
-    user.currentStreak = (user.currentStreak || 0) + 1;
+
+  if (user.last_active_date === yesterday) {
+    newStreak = user.current_streak + 1;
     streakContinued = true;
-  } else if (!user.lastActiveDate) {
-    // 初めての使用
-    user.currentStreak = 1;
+  } else if (!user.last_active_date) {
+    newStreak = 1;
     streakContinued = true;
   } else {
-    // ストリーク途切れ → リセット
-    user.currentStreak = 1;
+    newStreak = 1;
     streakContinued = false;
   }
-  
-  // 最長ストリークの更新
-  if (user.currentStreak > (user.longestStreak || 0)) {
-    user.longestStreak = user.currentStreak;
-  }
-  
-  // 最終アクティブ日を更新
-  user.lastActiveDate = today;
-  
-  // ストリークバッジのチェック
+
+  const newLongestStreak = Math.max(user.longest_streak, newStreak);
+
+  // バッジチェック
+  const currentBadges = user.badges || [];
   const streakBadges = [
     { threshold: 3, badge: BADGES.STREAK_3 },
     { threshold: 7, badge: BADGES.STREAK_7 },
     { threshold: 30, badge: BADGES.STREAK_30 },
     { threshold: 100, badge: BADGES.STREAK_100 },
   ];
-  
+
   for (const { threshold, badge } of streakBadges) {
-    if (user.currentStreak >= threshold && !user.badges.includes(badge.id)) {
-      user.badges.push(badge.id);
+    if (newStreak >= threshold && !currentBadges.includes(badge.id)) {
       newBadges.push(badge.id);
     }
   }
-  
-  return { 
-    currentStreak: user.currentStreak, 
-    longestStreak: user.longestStreak, 
+
+  // DB更新
+  await db.updateUser(userId, {
+    current_streak: newStreak,
+    longest_streak: newLongestStreak,
+    last_active_date: today,
+    badges: [...currentBadges, ...newBadges],
+  });
+
+  return {
+    currentStreak: newStreak,
+    longestStreak: newLongestStreak,
     newBadges,
-    streakContinued 
+    streakContinued,
   };
 }
 
-// 昨日の日付を取得
-function getYesterdayDateString(): string {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split('T')[0];
-}
-
-// ストリーク情報を取得
-export function getStreakInfo(userId: string): {
+export async function getStreakInfo(userId: string): Promise<{
   currentStreak: number;
   longestStreak: number;
   lastActiveDate?: string;
   isActiveToday: boolean;
-  willExpireSoon: boolean; // 今日使わないとストリークが切れる
-} {
-  const user = users.find(u => u.id === userId);
+  willExpireSoon: boolean;
+}> {
+  const user = await db.findUserById(userId);
   if (!user) {
-    return { 
-      currentStreak: 0, 
-      longestStreak: 0, 
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
       isActiveToday: false,
-      willExpireSoon: false 
+      willExpireSoon: false,
     };
   }
-  
+
   const today = getTodayDateString();
   const yesterday = getYesterdayDateString();
-  const isActiveToday = user.lastActiveDate === today;
-  const willExpireSoon = user.lastActiveDate === yesterday && !isActiveToday && user.currentStreak > 0;
-  
+  const isActiveToday = user.last_active_date === today;
+  const willExpireSoon = user.last_active_date === yesterday && !isActiveToday && user.current_streak > 0;
+
   return {
-    currentStreak: user.currentStreak || 0,
-    longestStreak: user.longestStreak || 0,
-    lastActiveDate: user.lastActiveDate,
+    currentStreak: user.current_streak,
+    longestStreak: user.longest_streak,
+    lastActiveDate: user.last_active_date || undefined,
     isActiveToday,
     willExpireSoon,
   };
 }
 
-// ==============================================
-// 統計・バッジ関連の関数
-// ==============================================
+// ========================================
+// 統計・バッジ関連（Supabase版）
+// ========================================
 
-// 使用回数を記録し、バッジをチェック
-export function recordUsage(userId: string): {
+export async function recordUsage(userId: string): Promise<{
   totalUsageCount: number;
   level: number;
   newBadges: string[];
-} {
-  const user = users.find(u => u.id === userId);
+}> {
+  const user = await db.findUserById(userId);
   if (!user) {
     return { totalUsageCount: 0, level: 1, newBadges: [] };
   }
-  
+
   const newBadges: string[] = [];
-  
-  // 総使用回数を増やす
-  user.totalUsageCount = (user.totalUsageCount || 0) + 1;
-  
-  // レベルを計算
-  const newLevel = calculateLevel(user.totalUsageCount);
-  user.level = newLevel;
-  
-  // 初使用バッジ
-  if (user.totalUsageCount === 1 && !user.badges.includes(BADGES.FIRST_USE.id)) {
-    user.badges.push(BADGES.FIRST_USE.id);
+  const newTotalUsageCount = user.total_usage_count + 1;
+  const newLevel = calculateLevel(newTotalUsageCount);
+  const currentBadges = user.badges || [];
+
+  // バッジチェック
+  if (newTotalUsageCount === 1 && !currentBadges.includes(BADGES.FIRST_USE.id)) {
     newBadges.push(BADGES.FIRST_USE.id);
   }
-  
-  // 使用回数バッジのチェック
+
   const usageBadges = [
     { threshold: 10, badge: BADGES.USAGE_10 },
     { threshold: 50, badge: BADGES.USAGE_50 },
     { threshold: 100, badge: BADGES.USAGE_100 },
     { threshold: 500, badge: BADGES.USAGE_500 },
   ];
-  
+
   for (const { threshold, badge } of usageBadges) {
-    if (user.totalUsageCount >= threshold && !user.badges.includes(badge.id)) {
-      user.badges.push(badge.id);
+    if (newTotalUsageCount >= threshold && !currentBadges.includes(badge.id)) {
       newBadges.push(badge.id);
     }
   }
-  
+
+  // DB更新
+  await db.updateUser(userId, {
+    total_usage_count: newTotalUsageCount,
+    level: newLevel,
+    badges: [...currentBadges, ...newBadges],
+  });
+
   return {
-    totalUsageCount: user.totalUsageCount,
-    level: user.level,
+    totalUsageCount: newTotalUsageCount,
+    level: newLevel,
     newBadges,
   };
 }
 
-// 成功を記録（ユーザーが「良かった」評価をした時）
-export function recordSuccess(userId: string): {
+export async function recordSuccess(userId: string): Promise<{
   successCount: number;
   successRate: number;
   newBadges: string[];
-} {
-  const user = users.find(u => u.id === userId);
+}> {
+  const user = await db.findUserById(userId);
   if (!user) {
     return { successCount: 0, successRate: 0, newBadges: [] };
   }
-  
+
   const newBadges: string[] = [];
-  
-  // 成功回数を増やす
-  user.successCount = (user.successCount || 0) + 1;
-  
-  // 成功率を計算
-  const successRate = user.totalUsageCount > 0 
-    ? Math.round((user.successCount / user.totalUsageCount) * 100) 
+  const newSuccessCount = user.success_count + 1;
+  const successRate = user.total_usage_count > 0
+    ? Math.round((newSuccessCount / user.total_usage_count) * 100)
     : 0;
-  
-  // 初成功バッジ
-  if (user.successCount === 1 && !user.badges.includes(BADGES.FIRST_SUCCESS.id)) {
-    user.badges.push(BADGES.FIRST_SUCCESS.id);
+  const currentBadges = user.badges || [];
+
+  if (newSuccessCount === 1 && !currentBadges.includes(BADGES.FIRST_SUCCESS.id)) {
     newBadges.push(BADGES.FIRST_SUCCESS.id);
   }
-  
-  // 成功率バッジ
-  if (successRate >= 50 && user.totalUsageCount >= 10 && !user.badges.includes(BADGES.SUCCESS_RATE_50.id)) {
-    user.badges.push(BADGES.SUCCESS_RATE_50.id);
+
+  if (successRate >= 50 && user.total_usage_count >= 10 && !currentBadges.includes(BADGES.SUCCESS_RATE_50.id)) {
     newBadges.push(BADGES.SUCCESS_RATE_50.id);
   }
-  
+
+  await db.updateUser(userId, {
+    success_count: newSuccessCount,
+    badges: [...currentBadges, ...newBadges],
+  });
+
   return {
-    successCount: user.successCount,
+    successCount: newSuccessCount,
     successRate,
     newBadges,
   };
 }
 
-// ユーザーの全統計情報を取得
-export function getUserStats(userId: string): {
+export async function getUserStats(userId: string): Promise<{
   totalUsageCount: number;
   successCount: number;
   successRate: number;
@@ -548,71 +483,48 @@ export function getUserStats(userId: string): {
   dailyUsageLimit: number;
   todayUsageCount: number;
   todayRemaining: number;
-} | null {
-  const user = users.find(u => u.id === userId);
+} | null> {
+  const user = await db.findUserById(userId);
   if (!user) return null;
-  
-  const todayUsageCount = getTodayUsageCount(userId);
-  const successRate = user.totalUsageCount > 0 
-    ? Math.round((user.successCount / user.totalUsageCount) * 100) 
+
+  const todayUsageCount = await db.getTodayUsageCount(userId);
+  const successRate = user.total_usage_count > 0
+    ? Math.round((user.success_count / user.total_usage_count) * 100)
     : 0;
-  
+
   return {
-    totalUsageCount: user.totalUsageCount || 0,
-    successCount: user.successCount || 0,
+    totalUsageCount: user.total_usage_count,
+    successCount: user.success_count,
     successRate,
-    level: user.level || 1,
-    levelName: getLevelName(user.level || 1),
-    badges: user.badges || [],
-    currentStreak: user.currentStreak || 0,
-    longestStreak: user.longestStreak || 0,
-    subscriptionType: user.subscriptionType || 'free',
-    dailyUsageLimit: user.dailyUsageLimit || DEFAULT_DAILY_USAGE_LIMIT,
+    level: user.level,
+    levelName: getLevelName(user.level),
+    badges: user.badges,
+    currentStreak: user.current_streak,
+    longestStreak: user.longest_streak,
+    subscriptionType: user.subscription_type,
+    dailyUsageLimit: user.daily_usage_limit,
     todayUsageCount,
-    todayRemaining: Math.max(0, (user.dailyUsageLimit || DEFAULT_DAILY_USAGE_LIMIT) - todayUsageCount),
+    todayRemaining: Math.max(0, user.daily_usage_limit - todayUsageCount),
   };
 }
 
-// プランをアップグレード
-export function upgradePlan(
-  userId: string, 
+export async function upgradePlan(
+  userId: string,
   newPlan: 'basic' | 'pro' | 'premium'
-): boolean {
-  const user = users.find(u => u.id === userId);
-  if (!user) return false;
-  
-  user.subscriptionType = newPlan;
-  user.dailyUsageLimit = PLAN_LIMITS[newPlan];
-  user.isSubscribed = true;
-  
-  return true;
+): Promise<boolean> {
+  const result = await db.updateUser(userId, {
+    subscription_type: newPlan,
+    daily_usage_limit: PLAN_LIMITS[newPlan],
+    is_subscribed: true,
+  });
+  return !!result;
 }
 
-// プランをダウングレード（解約時）
-export function downgradePlan(userId: string): boolean {
-  const user = users.find(u => u.id === userId);
-  if (!user) return false;
-  
-  user.subscriptionType = 'free';
-  user.dailyUsageLimit = PLAN_LIMITS.free;
-  user.isSubscribed = false;
-  
-  return true;
+export async function downgradePlan(userId: string): Promise<boolean> {
+  const result = await db.updateUser(userId, {
+    subscription_type: 'free',
+    daily_usage_limit: PLAN_LIMITS.free,
+    is_subscribed: false,
+  });
+  return !!result;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

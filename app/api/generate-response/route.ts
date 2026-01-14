@@ -111,9 +111,9 @@ export async function POST(request: NextRequest) {
 
       // Check daily usage limit (1日50回まで - Groq API制限を考慮)
       // AI生成前に使用回数をチェック（確実に制限を適用）
-      const usageCheck = canUseService(user.id);
+      const usageCheck = await canUseService(user.id);
       if (!usageCheck.canUse) {
-        const usageInfo = getUsageInfo(user.id);
+        const usageInfo = await getUsageInfo(user.id);
         return NextResponse.json(
           { 
             error: `1日の使用回数制限（${usageInfo.limit}回）に達しました。明日またお試しください。`,
@@ -157,13 +157,13 @@ export async function POST(request: NextRequest) {
 
       // 使用回数を事前にカウント（AI生成前に）
       // これにより、コピー&ペーストや開発者ツールでの直接呼び出しでも確実にカウントされる
-      incrementUsageCount(user.id);
+      await incrementUsageCount(user.id);
       
       // ストリークを更新
-      const streakResult = updateStreak(user.id);
+      const streakResult = await updateStreak(user.id);
       
       // 統計を記録（総使用回数、レベル、バッジ）
-      const usageResult = recordUsage(user.id);
+      const usageResult = await recordUsage(user.id);
       
       // 新しいバッジがあればログに記録
       const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
           if (decoded) {
             const user = await findUserById(decoded.userId);
             if (user) {
-              usageInfo = getUsageInfo(user.id);
+              usageInfo = await getUsageInfo(user.id);
               
               // ストリーク情報
               streakInfo = {

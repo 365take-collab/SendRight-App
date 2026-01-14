@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const streakInfo = getStreakInfo(user.id);
+    const streakInfo = await getStreakInfo(user.id);
     
     return NextResponse.json(streakInfo);
   } catch (error) {
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = updateStreak(user.id);
+    const result = await updateStreak(user.id);
     
     // 新しいバッジの詳細情報を追加
     const newBadgeDetails = result.newBadges.map(badgeId => {

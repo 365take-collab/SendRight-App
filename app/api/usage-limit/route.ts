@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const usageInfo = getUsageInfo(user.id);
+    const usageInfo = await getUsageInfo(user.id);
     return NextResponse.json({
       usageInfo,
       dailyUsageLimit: user.dailyUsageLimit || 50,

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const stats = getUserStats(user.id);
+    const stats = await getUserStats(user.id);
     if (!stats) {
       return NextResponse.json(
         { error: '統計情報の取得に失敗しました' },
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = recordSuccess(user.id);
+    const result = await recordSuccess(user.id);
     
     // 新しいバッジの詳細情報を追加
     const newBadgeDetails = result.newBadges.map(badgeId => {

@@ -113,9 +113,9 @@ export async function POST(request: NextRequest) {
 
       // Check daily usage limit (1日50回まで - Groq API制限を考慮)
       // 画像抽出も使用回数にカウント
-      const usageCheck = canUseService(user.id);
+      const usageCheck = await canUseService(user.id);
       if (!usageCheck.canUse) {
-        const usageInfo = getUsageInfo(user.id);
+        const usageInfo = await getUsageInfo(user.id);
         return NextResponse.json(
           { 
             error: `1日の使用回数制限（${usageInfo.limit}回）に達しました。明日またお試しください。`,
@@ -575,8 +575,8 @@ LINEやマッチングアプリでは：
         if (decoded) {
           const user = await findUserById(decoded.userId);
           if (user) {
-            incrementUsageCount(user.id);
-            usageInfo = getUsageInfo(user.id);
+            await incrementUsageCount(user.id);
+            usageInfo = await getUsageInfo(user.id);
           }
         }
       }
