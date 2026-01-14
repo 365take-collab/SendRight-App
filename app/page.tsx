@@ -142,10 +142,9 @@ export default function Home() {
         isSubscribed: true, // Utage側でサブスクリプション状態を管理
       });
       setToken('utage-token');
-    } else {
-      // Utage以外からのアクセス: 拒否（ミドルウェアで既に拒否されているはず）
-      router.push('/auth/login-utage');
     }
+    // Utage以外からのアクセス: メール登録フォームを表示（page.tsxの下部で処理）
+    // ローカルストレージにユーザー情報があれば復元される（別のuseEffectで処理）
 
     // 使用回数情報を取得（開発モードでない場合）
     if (!isDevMode) {

@@ -308,8 +308,15 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // 認証が必要なページ（メインアプリ）
-  const protectedPaths = ['/', '/help', '/subscribe'];
+  // トップページ（/）は誰でもアクセス可能（メール登録フォームを表示）
+  // 認証状態はアプリ側（page.tsx）で判定し、適切なUIを表示する
+  if (request.nextUrl.pathname === '/') {
+    console.log('トップページへのアクセスを許可（認証チェックはアプリ側で実施）');
+    return response;
+  }
+  
+  // それ以外の保護されたページ（/help, /subscribeなど）
+  const protectedPaths = ['/help', '/subscribe'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
   // 保護されたページへのアクセスにはトークンまたはUtageアクセスフラグが必要
