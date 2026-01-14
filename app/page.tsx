@@ -575,7 +575,87 @@ export default function Home() {
     }
   }, [error, isEmbedMode]);
 
-  // ログインしていない場合、Utageへの誘導ページを表示
+  // メール登録フォーム用の状態
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState('');
+
+  // メール登録処理
+  const handleRegister = async () => {
+    if (!registerEmail || !registerEmail.includes('@')) {
+      setRegisterError('有効なメールアドレスを入力してください');
+      return;
+    }
+
+    setIsRegistering(true);
+    setRegisterError('');
+
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: registerEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '登録に失敗しました');
+      }
+
+      // ローカルストレージに保存
+      localStorage.setItem('sendright_email', registerEmail);
+      localStorage.setItem('sendright_user', JSON.stringify(data.user));
+      
+      // ユーザー状態を更新
+      setUser({
+        id: data.user.id,
+        email: data.user.email,
+        isSubscribed: data.user.isSubscribed,
+      });
+      
+      // 使用回数情報を設定
+      setUsageInfo({
+        todayCount: 0,
+        limit: data.user.dailyUsageLimit || 3,
+        remaining: data.user.dailyUsageLimit || 3,
+      });
+      
+      // トークンを設定（メール登録ユーザー用）
+      setToken(`email-${data.user.id}`);
+      
+    } catch (err) {
+      setRegisterError(err instanceof Error ? err.message : '登録に失敗しました');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  // 初回ロード時にローカルストレージから復元
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('sendright_email');
+    const savedUser = localStorage.getItem('sendright_user');
+    if (savedEmail && savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          isSubscribed: userData.isSubscribed,
+        });
+        setToken(`email-${userData.id}`);
+        setUsageInfo({
+          todayCount: 0,
+          limit: userData.dailyUsageLimit || 3,
+          remaining: userData.dailyUsageLimit || 3,
+        });
+      } catch (e) {
+        console.error('Failed to restore user:', e);
+      }
+    }
+  }, []);
+
+  // ログインしていない場合、メール登録フォームを表示
   // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
   if (!user && !isDevMode && !isEmbedMode) {
     return (
@@ -595,28 +675,78 @@ export default function Home() {
             />
           </div>
           
-          {/* メッセージ */}
+          {/* メール登録フォーム */}
           <div className="bg-gradient-to-br from-gray-900/90 to-gray-950/90 rounded-3xl border border-gray-800/50 p-10">
             <h1 className="text-3xl font-bold text-white mb-4">
               SendRightへようこそ
             </h1>
-            <p className="text-gray-400 mb-8 leading-relaxed">
-              SendRightをご利用いただくには、<br />
-              会員サイトからログインしてください。
+            <p className="text-gray-400 mb-2 leading-relaxed">
+              メールアドレスを登録して、<br />
+              <span className="text-blue-400 font-bold">1日3回まで無料</span>でお試しください。
+            </p>
+            <p className="text-sm text-green-400 mb-6">
+              ✨ 登録無料・クレジットカード不要
             </p>
             
-            {/* Utageへのリンク */}
-            <a
-              href="https://utage-system.com/members/prUSVju86L5m/home"
-              className="inline-flex items-center justify-center w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all"
-            >
-              会員サイトでログイン
-              <span className="ml-2">→</span>
-            </a>
+            {/* メール入力 */}
+            <input
+              type="email"
+              value={registerEmail}
+              onChange={(e) => setRegisterEmail(e.target.value)}
+              placeholder="your@email.com"
+              className="w-full p-4 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+            />
             
-            <p className="text-sm text-gray-500 mt-6">
-              まだ会員登録がお済みでない方は、<br />
-              会員サイトで無料登録できます。
+            {registerError && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-300 text-sm">
+                {registerError}
+              </div>
+            )}
+            
+            <button
+              onClick={handleRegister}
+              disabled={isRegistering}
+              className="w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRegistering ? '登録中...' : '🚀 無料で始める'}
+            </button>
+            
+            <p className="text-xs text-gray-500 mt-6">
+              登録することで、利用規約とプライバシーポリシーに同意したものとみなされます。
+            </p>
+            
+            {/* 区切り線 */}
+            <div className="flex items-center my-6">
+              <div className="flex-1 border-t border-gray-700"></div>
+              <span className="px-4 text-gray-500 text-sm">または</span>
+              <div className="flex-1 border-t border-gray-700"></div>
+            </div>
+            
+            {/* 有料プランへの誘導 */}
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl p-4 mb-4">
+              <p className="text-white font-bold mb-1">🎁 7日間無料トライアル</p>
+              <p className="text-sm text-gray-400 mb-3">
+                有料プランなら<span className="text-blue-400 font-bold">1日50回</span>使えます
+              </p>
+              <a
+                href="https://utage-system.com/p/pv2aPWlkKS4z"
+                className="inline-block w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg hover:opacity-90 transition-all text-center"
+              >
+                7日間無料で試す →
+              </a>
+            </div>
+            
+            {/* 既存会員向けリンク */}
+            <p className="text-sm text-gray-500">
+              既に有料会員の方は{' '}
+              <a
+                href="https://utage-system.com/members/prUSVju86L5m/home"
+                className="text-blue-400 hover:underline"
+              >
+                会員サイト
+              </a>
+              {' '}からログイン
             </p>
           </div>
           

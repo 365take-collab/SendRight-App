@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage, BADGES, PLAN_LIMITS } from '@/lib/auth';
+import { findUserById as findUserByIdFromSupabase } from '@/lib/supabase';
 import { generateResponse } from '@/lib/ai';
 import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, checkIPWhitelist, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
 import { z } from 'zod';
@@ -40,6 +41,9 @@ export async function POST(request: NextRequest) {
       // Utage会員サイトにログイン済みユーザーからのアクセス
       const isEmbedToken = token === 'utage-embed-token' || token === 'utage-token';
       
+      // メール登録ユーザー用トークン（email-{userId}形式）
+      const isEmailToken = token.startsWith('email-');
+      
       // 埋め込みトークンの場合、Refererをチェック（セキュリティ強化）
       if (isEmbedToken) {
         const referer = request.headers.get('referer') || '';
@@ -74,6 +78,32 @@ export async function POST(request: NextRequest) {
           successCount: 0,
           level: 1,
           createdAt: new Date(),
+        };
+      } else if (isEmailToken) {
+        // メール登録ユーザー: Supabaseから直接ユーザーを取得
+        const userId = token.substring(6); // 'email-' を除去
+        const dbUser = await findUserByIdFromSupabase(userId);
+        if (!dbUser) {
+          return NextResponse.json(
+            { error: 'ユーザーが見つかりません' },
+            { status: 404 }
+          );
+        }
+        // DbUser型をUser型に変換
+        user = {
+          id: dbUser.id,
+          email: dbUser.email,
+          isSubscribed: dbUser.is_subscribed,
+          subscriptionType: (dbUser.subscription_type || 'free') as 'free' | 'monthly' | 'yearly',
+          isUtageUser: dbUser.is_utage_user,
+          dailyUsageLimit: dbUser.daily_usage_limit,
+          currentStreak: dbUser.current_streak,
+          longestStreak: dbUser.longest_streak,
+          badges: dbUser.badges || [],
+          totalUsageCount: dbUser.total_usage_count,
+          successCount: dbUser.success_count,
+          level: dbUser.level,
+          createdAt: new Date(dbUser.created_at),
         };
       } else {
         const decoded = verifyToken(token);
