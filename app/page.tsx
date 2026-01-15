@@ -654,7 +654,7 @@ export default function Home() {
     }
   }, []);
 
-  // ログインしていない場合、メール登録フォームを表示
+  // ログインしていない場合、Utage誘導ページを表示
   // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
   if (!user && !isDevMode && !isEmbedMode) {
     return (
@@ -674,79 +674,45 @@ export default function Home() {
             />
           </div>
           
-          {/* メール登録フォーム */}
+          {/* Utage誘導 */}
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-xl shadow-pink-100/30 p-10">
             <h1 className="text-3xl font-bold text-gray-800 mb-4">
               SendRightへようこそ
             </h1>
-            <p className="text-gray-600 mb-2 leading-relaxed">
-              メールアドレスを登録して、<br />
-              <span className="text-pink-500 font-bold">1日3回まで無料</span>でお試しください。
-            </p>
-            <p className="text-sm text-green-600 mb-6">
-              ✨ 登録無料・クレジットカード不要
+            <p className="text-gray-600 mb-6 leading-relaxed">
+              AIがあなたの代わりに<br />
+              <span className="text-pink-500 font-bold">最適な返信</span>を生成します
             </p>
             
-            {/* メール入力 */}
-            <input
-              type="email"
-              value={registerEmail}
-              onChange={(e) => setRegisterEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 mb-4"
-              onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-            />
-            
-            {registerError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                {registerError}
-              </div>
-            )}
-            
-            <button
-              onClick={handleRegister}
-              disabled={isRegistering}
-              className="w-full py-4 bg-gradient-to-r from-pink-500 via-pink-400 to-coral-400 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-200"
-            >
-              {isRegistering ? '登録中...' : '🚀 無料で始める'}
-            </button>
-            
-            <p className="text-xs text-gray-500 mt-6">
-              登録することで、利用規約とプライバシーポリシーに同意したものとみなされます。
-            </p>
-            
-            {/* 区切り線 */}
-            <div className="flex items-center my-6">
-              <div className="flex-1 border-t border-gray-200"></div>
-              <span className="px-4 text-gray-400 text-sm">または</span>
-              <div className="flex-1 border-t border-gray-200"></div>
-            </div>
-            
-            {/* 有料プランへの誘導 */}
-            <div className="bg-gradient-to-r from-pink-50 to-coral-50 border border-pink-200 rounded-xl p-4 mb-4">
-              <p className="text-gray-800 font-bold mb-1">🎁 7日間無料トライアル</p>
-              <p className="text-sm text-gray-600 mb-3">
-                有料プランなら<span className="text-pink-500 font-bold">1日50回</span>使えます
+            {/* 7日間無料トライアル */}
+            <div className="bg-gradient-to-r from-pink-50 to-coral-50 border border-pink-200 rounded-xl p-6 mb-6">
+              <p className="text-gray-800 font-bold text-lg mb-2">🎁 7日間無料トライアル</p>
+              <p className="text-sm text-gray-600 mb-4">
+                今なら<span className="text-pink-500 font-bold">7日間無料</span>でお試しいただけます<br />
+                1日50回まで使い放題！
               </p>
               <a
                 href="https://utage-system.com/p/pv2aPWlkKS4z"
-                className="inline-block w-full py-3 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-lg hover:opacity-90 transition-all text-center shadow-md"
+                className="inline-block w-full py-4 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all text-center shadow-lg shadow-pink-200"
               >
                 7日間無料で試す →
               </a>
             </div>
             
+            {/* 区切り線 */}
+            <div className="flex items-center my-6">
+              <div className="flex-1 border-t border-gray-200"></div>
+              <span className="px-4 text-gray-400 text-sm">既に会員の方</span>
+              <div className="flex-1 border-t border-gray-200"></div>
+            </div>
+            
             {/* 既存会員向けリンク */}
-            <p className="text-sm text-gray-500">
-              既に有料会員の方は{' '}
-              <a
-                href="https://utage-system.com/members/prUSVju86L5m/home"
-                className="text-pink-500 hover:underline"
-              >
-                会員サイト
-              </a>
-              {' '}からログイン
-            </p>
+            <a
+              href="https://utage-system.com/members/prUSVju86L5m/home"
+              className="inline-block w-full py-3 bg-white border-2 border-pink-300 text-pink-500 font-bold rounded-xl hover:bg-pink-50 transition-all text-center"
+            >
+              会員サイトからログイン
+            </a>
           </div>
           
           {/* フッター */}
