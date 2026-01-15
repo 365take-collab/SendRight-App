@@ -12,17 +12,11 @@ export default function LoginPage() {
     router.replace('/auth/login-utage');
   }, [router]);
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-b from-white via-pink-50/20 to-white flex items-center justify-center px-4">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
-        <p className="text-gray-300 text-lg">Utageログインページにリダイレクト中...</p>
+        <Loader2 className="w-12 h-12 animate-spin text-pink-500 mx-auto mb-4" />
+        <p className="text-gray-600 text-lg">Utageログインページにリダイレクト中...</p>
       </div>
     </div>
   );
 }
-
-
-
-
-
-

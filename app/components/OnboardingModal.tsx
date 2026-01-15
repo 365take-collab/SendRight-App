@@ -66,21 +66,21 @@ export default function OnboardingModal() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="relative bg-gray-900 rounded-2xl border border-gray-800 max-w-2xl w-full mx-4 p-8 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl border border-pink-100 max-w-2xl w-full mx-4 p-8 shadow-2xl">
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-gray-400 hover:text-pink-500 transition-colors"
         >
           <X className="w-6 h-6" />
         </button>
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-gray-800">
               {steps[currentStep].title}
             </h2>
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-gray-500">
               {currentStep + 1} / {steps.length}
             </span>
           </div>
@@ -91,15 +91,15 @@ export default function OnboardingModal() {
                 <div
                   key={index}
                   className={`h-1 flex-1 rounded ${
-                    index <= currentStep ? 'bg-blue-500' : 'bg-gray-700'
+                    index <= currentStep ? 'bg-pink-500' : 'bg-gray-200'
                   }`}
                 />
               ))}
             </div>
           </div>
 
-          <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
-            <p className="text-gray-300 whitespace-pre-line leading-relaxed">
+          <div className="bg-pink-50/50 rounded-xl p-6 mb-6 border border-pink-100">
+            <p className="text-gray-700 whitespace-pre-line leading-relaxed">
               {steps[currentStep].content}
             </p>
           </div>
@@ -108,7 +108,7 @@ export default function OnboardingModal() {
         <div className="flex items-center justify-between">
           <button
             onClick={handleSkip}
-            className="text-gray-400 hover:text-white transition-colors text-sm"
+            className="text-gray-500 hover:text-pink-500 transition-colors text-sm"
           >
             スキップ
           </button>
@@ -117,7 +117,7 @@ export default function OnboardingModal() {
             {currentStep > 0 && (
               <button
                 onClick={handlePrev}
-                className="flex items-center px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 mr-1" />
                 前へ
@@ -126,7 +126,7 @@ export default function OnboardingModal() {
             
             <button
               onClick={handleNext}
-              className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="flex items-center px-6 py-2 bg-gradient-to-r from-pink-500 to-coral-500 text-white rounded-lg hover:from-pink-400 hover:to-coral-400 transition-colors font-medium shadow-md"
             >
               {currentStep === steps.length - 1 ? (
                 <>

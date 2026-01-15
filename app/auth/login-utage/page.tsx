@@ -94,20 +94,20 @@ function UtageLoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="max-w-md w-full space-y-8 p-8 bg-gray-900 rounded-2xl border border-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-pink-50/20 to-white">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white/90 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-xl">
         {status === 'loading' && (
           <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
-            <p className="text-gray-300 text-lg">SendRightアプリにログイン中...</p>
+            <Loader2 className="w-12 h-12 animate-spin text-pink-500 mx-auto mb-4" />
+            <p className="text-gray-600 text-lg">SendRightアプリにログイン中...</p>
           </div>
         )}
 
         {status === 'input' && (
           <div className="text-center">
-            <div className="text-blue-400 text-5xl mb-4">📧</div>
-            <h2 className="text-gray-200 font-semibold text-xl mb-2">SendRightにログイン</h2>
-            <p className="text-sm text-gray-400 mb-6">購入時に登録したメールアドレスを入力してください</p>
+            <div className="text-pink-500 text-5xl mb-4">📧</div>
+            <h2 className="text-gray-800 font-semibold text-xl mb-2">SendRightにログイン</h2>
+            <p className="text-sm text-gray-500 mb-6">購入時に登録したメールアドレスを入力してください</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="email"
@@ -115,11 +115,11 @@ function UtageLoginContent() {
                 onChange={(e) => setInputEmail(e.target.value)}
                 placeholder="メールアドレス"
                 required
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200"
               />
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition font-medium"
+                className="w-full bg-gradient-to-r from-pink-500 to-coral-500 hover:from-pink-400 hover:to-coral-400 text-white px-6 py-3 rounded-lg transition font-medium shadow-md"
               >
                 ログイン
               </button>
@@ -129,21 +129,21 @@ function UtageLoginContent() {
 
         {status === 'success' && (
           <div className="text-center">
-            <div className="text-green-400 text-5xl mb-4">✓</div>
-            <p className="text-gray-300 text-lg">ログイン成功しました</p>
+            <div className="text-green-500 text-5xl mb-4">✓</div>
+            <p className="text-gray-600 text-lg">ログイン成功しました</p>
             <p className="text-sm text-gray-500 mt-2">ホームページに移動します...</p>
           </div>
         )}
 
         {status === 'error' && (
           <div className="text-center">
-            <div className="text-red-400 text-5xl mb-4">✗</div>
-            <p className="text-gray-200 font-semibold text-lg">ログインに失敗しました</p>
-            <p className="text-sm text-gray-400 mt-2">{errorMessage}</p>
+            <div className="text-red-500 text-5xl mb-4">✗</div>
+            <p className="text-gray-800 font-semibold text-lg">ログインに失敗しました</p>
+            <p className="text-sm text-gray-500 mt-2">{errorMessage}</p>
             <div className="mt-6">
               <a 
                 href={process.env.NEXT_PUBLIC_UTAGE_MEMBER_URL || 'https://utage-system.com/members/prUSVju86L5m/home'}
-                className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition"
+                className="inline-block bg-gradient-to-r from-pink-500 to-coral-500 hover:from-pink-400 hover:to-coral-400 text-white px-6 py-3 rounded-lg transition shadow-md"
               >
                 会員ページに戻る
               </a>
@@ -157,11 +157,11 @@ function UtageLoginContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="max-w-md w-full space-y-8 p-8 bg-gray-900 rounded-2xl border border-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-pink-50/20 to-white">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white/90 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-xl">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
-          <p className="text-gray-300 text-lg">読み込み中...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-pink-500 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">読み込み中...</p>
         </div>
       </div>
     </div>

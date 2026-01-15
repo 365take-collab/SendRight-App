@@ -72,9 +72,9 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-6 animate-pulse">
-        <div className="h-6 bg-gray-800 rounded w-1/3 mb-4"></div>
-        <div className="h-4 bg-gray-800 rounded w-2/3"></div>
+      <div className="bg-white/80 rounded-2xl border border-pink-100 p-6 animate-pulse shadow-sm">
+        <div className="h-6 bg-pink-100 rounded w-1/3 mb-4"></div>
+        <div className="h-4 bg-pink-100 rounded w-2/3"></div>
       </div>
     );
   }
@@ -87,51 +87,51 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
   const progressToNextLevel = Math.min(100, (stats.totalUsageCount % 50) * 2);
 
   return (
-    <div className="bg-gradient-to-br from-gray-900/80 to-gray-950/80 rounded-2xl border border-gray-800/50 overflow-hidden fade-in-up">
+    <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden fade-in-up shadow-sm">
       {/* ヘッダー部分（常に表示） */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-gray-800/30 transition-all duration-300"
+        className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-pink-50/50 transition-all duration-300"
       >
         <div className="flex items-center space-x-4">
           {/* ストリーク表示 */}
-          <div className="flex items-center bg-gradient-to-r from-orange-500/20 to-red-500/20 px-4 py-2 rounded-full border border-orange-500/30">
-            <Flame className="w-5 h-5 text-orange-400 mr-2" />
-            <span className="text-lg font-bold text-white">{stats.currentStreak}</span>
-            <span className="text-sm text-gray-400 ml-1">日連続</span>
+          <div className="flex items-center bg-gradient-to-r from-orange-50 to-red-50 px-4 py-2 rounded-full border border-orange-200">
+            <Flame className="w-5 h-5 text-orange-500 mr-2" />
+            <span className="text-lg font-bold text-gray-800">{stats.currentStreak}</span>
+            <span className="text-sm text-gray-500 ml-1">日連続</span>
           </div>
           
           {/* レベル表示 */}
-          <div className="flex items-center bg-gradient-to-r from-purple-500/20 to-blue-500/20 px-4 py-2 rounded-full border border-purple-500/30">
-            <Star className="w-5 h-5 text-purple-400 mr-2" />
-            <span className="text-lg font-bold text-white">Lv.{stats.level}</span>
-            <span className="text-sm text-gray-400 ml-1">{stats.levelName}</span>
+          <div className="flex items-center bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-full border border-purple-200">
+            <Star className="w-5 h-5 text-purple-500 mr-2" />
+            <span className="text-lg font-bold text-gray-800">Lv.{stats.level}</span>
+            <span className="text-sm text-gray-500 ml-1">{stats.levelName}</span>
           </div>
           
           {/* 今日の使用回数 */}
-          <div className="flex items-center bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-4 py-2 rounded-full border border-blue-500/30">
-            <Zap className="w-5 h-5 text-blue-400 mr-2" />
-            <span className="text-lg font-bold text-white">{stats.todayRemaining}</span>
-            <span className="text-sm text-gray-400 ml-1">/{stats.dailyUsageLimit}回</span>
+          <div className="flex items-center bg-gradient-to-r from-pink-50 to-coral-50 px-4 py-2 rounded-full border border-pink-200">
+            <Zap className="w-5 h-5 text-pink-500 mr-2" />
+            <span className="text-lg font-bold text-gray-800">{stats.todayRemaining}</span>
+            <span className="text-sm text-gray-500 ml-1">/{stats.dailyUsageLimit}回</span>
           </div>
         </div>
         
         <div className="flex items-center space-x-3">
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-gray-500">
             {isExpanded ? '閉じる' : '詳細を見る'}
           </span>
           {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
+            <ChevronUp className="w-5 h-5 text-gray-500" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
+            <ChevronDown className="w-5 h-5 text-gray-500" />
           )}
         </div>
       </button>
 
       {/* ストリーク警告（途切れそうな場合） */}
       {streakInfo?.willExpireSoon && (
-        <div className="mx-6 mb-4 p-4 bg-yellow-900/30 border border-yellow-700/50 rounded-xl">
-          <p className="text-yellow-300 text-sm font-medium flex items-center">
+        <div className="mx-6 mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <p className="text-yellow-700 text-sm font-medium flex items-center">
             <Flame className="w-4 h-4 mr-2 animate-pulse" />
             今日使わないと{stats.currentStreak}日連続のストリークが途切れます！
           </p>
@@ -140,59 +140,59 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
 
       {/* 展開時の詳細表示 */}
       {isExpanded && (
-        <div className="px-6 pb-6 space-y-6 border-t border-gray-800/50 pt-6">
+        <div className="px-6 pb-6 space-y-6 border-t border-pink-100 pt-6">
           {/* 統計カード */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* 総使用回数 */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            <div className="bg-pink-50/50 rounded-xl p-4 border border-pink-100">
               <div className="flex items-center justify-between mb-2">
-                <Target className="w-5 h-5 text-blue-400" />
+                <Target className="w-5 h-5 text-pink-500" />
                 <span className="text-xs text-gray-500">総計</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.totalUsageCount}</p>
-              <p className="text-xs text-gray-400">回使用</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.totalUsageCount}</p>
+              <p className="text-xs text-gray-500">回使用</p>
             </div>
             
             {/* 成功率 */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            <div className="bg-green-50/50 rounded-xl p-4 border border-green-100">
               <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="w-5 h-5 text-green-400" />
+                <TrendingUp className="w-5 h-5 text-green-500" />
                 <span className="text-xs text-gray-500">成功率</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.successRate}%</p>
-              <p className="text-xs text-gray-400">{stats.successCount}回成功</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.successRate}%</p>
+              <p className="text-xs text-gray-500">{stats.successCount}回成功</p>
             </div>
             
             {/* 最長ストリーク */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            <div className="bg-yellow-50/50 rounded-xl p-4 border border-yellow-100">
               <div className="flex items-center justify-between mb-2">
-                <Trophy className="w-5 h-5 text-yellow-400" />
+                <Trophy className="w-5 h-5 text-yellow-500" />
                 <span className="text-xs text-gray-500">最長記録</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.longestStreak}</p>
-              <p className="text-xs text-gray-400">日連続</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.longestStreak}</p>
+              <p className="text-xs text-gray-500">日連続</p>
             </div>
             
             {/* バッジ数 */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
               <div className="flex items-center justify-between mb-2">
-                <Award className="w-5 h-5 text-purple-400" />
+                <Award className="w-5 h-5 text-purple-500" />
                 <span className="text-xs text-gray-500">バッジ</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.badges.length}</p>
-              <p className="text-xs text-gray-400">個獲得</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.badges.length}</p>
+              <p className="text-xs text-gray-500">個獲得</p>
             </div>
           </div>
 
           {/* レベル進捗バー */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+          <div className="bg-pink-50/50 rounded-xl p-4 border border-pink-100">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-gray-300">次のレベルまで</span>
-              <span className="text-sm text-gray-400">{progressToNextLevel}%</span>
+              <span className="text-sm font-medium text-gray-700">次のレベルまで</span>
+              <span className="text-sm text-gray-500">{progressToNextLevel}%</span>
             </div>
-            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-pink-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-pink-500 to-coral-500 rounded-full transition-all duration-500"
                 style={{ width: `${progressToNextLevel}%` }}
               />
             </div>
@@ -200,15 +200,15 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
 
           {/* 獲得バッジ */}
           <div>
-            <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
-              <Award className="w-4 h-4 mr-2 text-purple-400" />
+            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+              <Award className="w-4 h-4 mr-2 text-purple-500" />
               獲得バッジ
             </h4>
             <div className="flex flex-wrap gap-2">
               {stats.badgeDetails.map((badge) => (
                 <div
                   key={badge.id}
-                  className="px-3 py-2 bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-full border border-purple-700/30 text-sm"
+                  className="px-3 py-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-full border border-purple-200 text-sm text-gray-700"
                   title={badge.description}
                 >
                   <span>{badge.name}</span>
@@ -222,24 +222,24 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
 
           {/* プラン情報・アップグレード導線 */}
           {!isPaidPlan && (
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-5 border border-blue-700/30">
+            <div className="bg-gradient-to-r from-pink-50 to-coral-50 rounded-xl p-5 border border-pink-200">
               <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="text-lg font-bold text-white mb-2 flex items-center">
-                    <Crown className="w-5 h-5 mr-2 text-yellow-400" />
+                  <h4 className="text-lg font-bold text-gray-800 mb-2 flex items-center">
+                    <Crown className="w-5 h-5 mr-2 text-yellow-500" />
                     プロプランにアップグレード
                   </h4>
-                  <ul className="text-sm text-gray-300 space-y-1">
+                  <ul className="text-sm text-gray-600 space-y-1">
                     <li className="flex items-center">
-                      <Lock className="w-4 h-4 mr-2 text-gray-500" />
+                      <Lock className="w-4 h-4 mr-2 text-gray-400" />
                       1日50回まで使用可能（現在3回）
                     </li>
                     <li className="flex items-center">
-                      <Lock className="w-4 h-4 mr-2 text-gray-500" />
+                      <Lock className="w-4 h-4 mr-2 text-gray-400" />
                       詳細な分析機能
                     </li>
                     <li className="flex items-center">
-                      <Lock className="w-4 h-4 mr-2 text-gray-500" />
+                      <Lock className="w-4 h-4 mr-2 text-gray-400" />
                       履歴無制限
                     </li>
                   </ul>
@@ -249,7 +249,7 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
                     // Utageの決済ページにリダイレクト
                     window.location.href = process.env.NEXT_PUBLIC_UTAGE_CHECKOUT_URL || '/subscribe';
                   }}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full hover:from-blue-400 hover:to-purple-400 transition-all active:scale-95"
+                  className="px-6 py-3 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full hover:from-pink-400 hover:to-coral-400 transition-all active:scale-95 shadow-md"
                 >
                   アップグレード
                 </button>

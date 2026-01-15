@@ -658,11 +658,11 @@ export default function Home() {
   // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
   if (!user && !isDevMode && !isEmbedMode) {
     return (
-      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-white via-pink-50/30 to-white relative overflow-hidden flex items-center justify-center">
         {/* 背景 */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-black via-purple-950/20 to-black pointer-events-none"></div>
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/8 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/8 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute inset-0 pointer-events-none"></div>
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-pink-200/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-coral-200/20 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
         
         <div className="relative z-10 max-w-lg mx-auto px-6 text-center">
           {/* ロゴ */}
@@ -675,15 +675,15 @@ export default function Home() {
           </div>
           
           {/* メール登録フォーム */}
-          <div className="bg-gradient-to-br from-gray-900/90 to-gray-950/90 rounded-3xl border border-gray-800/50 p-10">
-            <h1 className="text-3xl font-bold text-white mb-4">
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-xl shadow-pink-100/30 p-10">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">
               SendRightへようこそ
             </h1>
-            <p className="text-gray-400 mb-2 leading-relaxed">
+            <p className="text-gray-600 mb-2 leading-relaxed">
               メールアドレスを登録して、<br />
-              <span className="text-blue-400 font-bold">1日3回まで無料</span>でお試しください。
+              <span className="text-pink-500 font-bold">1日3回まで無料</span>でお試しください。
             </p>
-            <p className="text-sm text-green-400 mb-6">
+            <p className="text-sm text-green-600 mb-6">
               ✨ 登録無料・クレジットカード不要
             </p>
             
@@ -693,12 +693,12 @@ export default function Home() {
               value={registerEmail}
               onChange={(e) => setRegisterEmail(e.target.value)}
               placeholder="your@email.com"
-              className="w-full p-4 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 mb-4"
               onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
             />
             
             {registerError && (
-              <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-300 text-sm">
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
                 {registerError}
               </div>
             )}
@@ -706,7 +706,7 @@ export default function Home() {
             <button
               onClick={handleRegister}
               disabled={isRegistering}
-              className="w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 bg-gradient-to-r from-pink-500 via-pink-400 to-coral-400 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-200"
             >
               {isRegistering ? '登録中...' : '🚀 無料で始める'}
             </button>
@@ -717,20 +717,20 @@ export default function Home() {
             
             {/* 区切り線 */}
             <div className="flex items-center my-6">
-              <div className="flex-1 border-t border-gray-700"></div>
-              <span className="px-4 text-gray-500 text-sm">または</span>
-              <div className="flex-1 border-t border-gray-700"></div>
+              <div className="flex-1 border-t border-gray-200"></div>
+              <span className="px-4 text-gray-400 text-sm">または</span>
+              <div className="flex-1 border-t border-gray-200"></div>
             </div>
             
             {/* 有料プランへの誘導 */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl p-4 mb-4">
-              <p className="text-white font-bold mb-1">🎁 7日間無料トライアル</p>
-              <p className="text-sm text-gray-400 mb-3">
-                有料プランなら<span className="text-blue-400 font-bold">1日50回</span>使えます
+            <div className="bg-gradient-to-r from-pink-50 to-coral-50 border border-pink-200 rounded-xl p-4 mb-4">
+              <p className="text-gray-800 font-bold mb-1">🎁 7日間無料トライアル</p>
+              <p className="text-sm text-gray-600 mb-3">
+                有料プランなら<span className="text-pink-500 font-bold">1日50回</span>使えます
               </p>
               <a
                 href="https://utage-system.com/p/pv2aPWlkKS4z"
-                className="inline-block w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg hover:opacity-90 transition-all text-center"
+                className="inline-block w-full py-3 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-lg hover:opacity-90 transition-all text-center shadow-md"
               >
                 7日間無料で試す →
               </a>
@@ -741,7 +741,7 @@ export default function Home() {
               既に有料会員の方は{' '}
               <a
                 href="https://utage-system.com/members/prUSVju86L5m/home"
-                className="text-blue-400 hover:underline"
+                className="text-pink-500 hover:underline"
               >
                 会員サイト
               </a>
@@ -750,7 +750,7 @@ export default function Home() {
           </div>
           
           {/* フッター */}
-          <p className="text-xs text-gray-600 mt-8">
+          <p className="text-xs text-gray-500 mt-8">
             © 2024 SendRight. All rights reserved.
           </p>
         </div>
@@ -759,12 +759,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-white via-pink-50/20 to-white relative overflow-hidden">
       {/* 背景の微細なグラデーション効果 */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-black via-purple-950/20 to-black pointer-events-none"></div>
-      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/8 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/8 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
-      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute inset-0 pointer-events-none"></div>
+      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-pink-200/15 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-coral-200/15 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-pink-100/10 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
       
       {/* パーティクル背景 */}
       <div className="particle-bg">
@@ -784,7 +784,7 @@ export default function Home() {
       <div className="relative z-10">
       {/* 埋め込みモードでない場合のみフルヘッダーを表示 */}
       {!isEmbedMode ? (
-      <nav className="glass-effect border-b border-gray-900/50 sticky top-0 z-50">
+      <nav className="glass-effect border-b border-pink-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-4">
@@ -797,7 +797,7 @@ export default function Home() {
               </Link>
               <Link
                 href="/help"
-                className="flex items-center text-gray-400 hover:text-white transition-colors"
+                className="flex items-center text-gray-500 hover:text-pink-500 transition-colors"
                 title="使い方ガイド"
               >
                 <HelpCircle className="w-5 h-5" />
@@ -806,19 +806,19 @@ export default function Home() {
             <div className="flex items-center space-x-6">
               {(user || isDevMode) ? (
                 <div className="flex items-center space-x-4">
-                  <span className="flex items-center text-base text-gray-300 font-medium">
+                  <span className="flex items-center text-base text-gray-700 font-medium">
                     {user?.isSubscribed ? (
-                      <Crown className="w-5 h-5 mr-2 text-yellow-400" />
+                      <Crown className="w-5 h-5 mr-2 text-yellow-500" />
                     ) : (
-                      <Zap className="w-5 h-5 mr-2 text-blue-400" />
+                      <Zap className="w-5 h-5 mr-2 text-pink-500" />
                     )}
                     {isDevMode ? '開発モード' : user?.isSubscribed ? 'プロ会員' : '無料プラン'}
                   </span>
                   {usageInfo && !isDevMode && (
                     <div className="flex flex-col items-end gap-1">
-                      <span className="flex items-center text-sm text-gray-400 font-medium">
+                      <span className="flex items-center text-sm text-gray-600 font-medium">
                         <span className="mr-1">今日の使用回数:</span>
-                        <span className={`font-bold ${usageInfo.remaining <= 10 ? 'text-red-400' : usageInfo.remaining <= 30 ? 'text-yellow-400' : 'text-green-400'}`}>
+                        <span className={`font-bold ${usageInfo.remaining <= 10 ? 'text-red-500' : usageInfo.remaining <= 30 ? 'text-yellow-600' : 'text-green-600'}`}>
                           {usageInfo.todayCount}/{usageInfo.limit}回
                         </span>
                         <span className="ml-1 text-gray-500">(残り{usageInfo.remaining}回)</span>
@@ -842,7 +842,7 @@ export default function Home() {
               {!isDevMode && (
                 <button
                   onClick={handleLogout}
-                  className="flex items-center text-gray-300 hover:text-white transition-colors font-medium"
+                  className="flex items-center text-gray-600 hover:text-pink-500 transition-colors font-medium"
                 >
                   <LogOut className="w-5 h-5 mr-2" />
                   ログアウト
@@ -854,7 +854,7 @@ export default function Home() {
       </nav>
       ) : (
         /* 埋め込みモード用のシンプルヘッダー */
-        <div className="py-4 px-6 border-b border-gray-800/50">
+        <div className="py-4 px-6 border-b border-pink-100">
           <div className="flex items-center justify-between max-w-5xl mx-auto">
             <div className="flex items-center space-x-3">
               <img 
@@ -864,7 +864,7 @@ export default function Home() {
               />
             </div>
             {usageInfo && (
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-gray-600">
                 残り{usageInfo.remaining}回
               </span>
             )}
@@ -884,12 +884,12 @@ export default function Home() {
         
         <div className="apple-card apple-glow p-10 sm:p-12 fade-in-up">
           <div className="flex items-center justify-between mb-12">
-            <h2 className="text-5xl sm:text-6xl font-bold text-white tracking-tight gradient-text">
+            <h2 className="text-5xl sm:text-6xl font-bold text-gray-800 tracking-tight">
               返信を生成
             </h2>
             <Link
               href="/help"
-              className="flex items-center text-gray-400 hover:text-white transition-colors text-sm"
+              className="flex items-center text-gray-500 hover:text-pink-500 transition-colors text-sm"
             >
               <HelpCircle className="w-5 h-5 mr-2" />
               使い方を見る
@@ -897,12 +897,12 @@ export default function Home() {
           </div>
 
           {error && (
-            <div className="mb-8 p-6 bg-red-900/30 border border-red-800/50 rounded-2xl text-red-300">
+            <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl text-red-600">
               <p className="mb-4 text-lg">{error}</p>
               {usageInfo && usageInfo.remaining === 0 && !isDevMode && (
                 <button
                   onClick={() => setShowUpgradeModal(true)}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full text-sm hover:from-blue-400 hover:to-purple-400 transition-all"
+                  className="px-4 py-2 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full text-sm hover:from-pink-400 hover:to-coral-400 transition-all"
                 >
                   アップグレードして制限を解除
                 </button>
@@ -912,29 +912,29 @@ export default function Home() {
 
           <div className="space-y-10">
             {/* 前提情報セクション */}
-            <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 overflow-hidden fade-in-up" style={{ animationDelay: '0.1s' }}>
+            <div className="bg-white/80 rounded-2xl border border-pink-100 overflow-hidden fade-in-up shadow-sm" style={{ animationDelay: '0.1s' }}>
               <button
                 onClick={() => setShowProfileInfo(!showProfileInfo)}
-                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-800/50 transition-all duration-300 bg-gradient-to-r from-gray-900/60 to-gray-950/60 rounded-2xl border border-gray-800/50 hover:border-blue-500/30 hover:shadow-lg"
+                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-pink-50/50 transition-all duration-300 bg-gradient-to-r from-white to-pink-50/30 rounded-2xl border border-pink-100 hover:border-pink-200 hover:shadow-md"
               >
                 <div className="flex items-center space-x-3">
-                  <UserIcon className="w-5 h-5 text-blue-400 float-animation" />
-                  <span className="text-lg font-bold text-white tracking-tight gradient-text-strong">
+                  <UserIcon className="w-5 h-5 text-pink-500 float-animation" />
+                  <span className="text-lg font-bold text-gray-800 tracking-tight gradient-text-strong">
                     パーソナライズ設定
                   </span>
                 </div>
                 {showProfileInfo ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400 transition-transform duration-300" />
+                  <ChevronUp className="w-5 h-5 text-gray-500 transition-transform duration-300" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400 transition-transform duration-300" />
+                  <ChevronDown className="w-5 h-5 text-gray-500 transition-transform duration-300" />
                 )}
               </button>
               
               {showProfileInfo && (
-                <div className="px-6 py-6 space-y-6 border-t border-gray-800/50">
+                <div className="px-6 py-6 space-y-6 border-t border-pink-100">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         名前
                       </label>
                       <input
@@ -942,12 +942,12 @@ export default function Home() {
                         value={profileInfo.name}
                         onChange={(e) => setProfileInfo({ ...profileInfo, name: e.target.value })}
                         placeholder="例: 美咲"
-                        className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500"
+                        className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         年齢
                       </label>
                       <input
@@ -955,13 +955,13 @@ export default function Home() {
                         value={profileInfo.age}
                         onChange={(e) => setProfileInfo({ ...profileInfo, age: e.target.value })}
                         placeholder="例: 24歳"
-                        className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500"
+                        className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400"
                       />
                     </div>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       関係性
                     </label>
                     <input
@@ -969,12 +969,12 @@ export default function Home() {
                       value={profileInfo.relationship}
                       onChange={(e) => setProfileInfo({ ...profileInfo, relationship: e.target.value })}
                       placeholder="例: 知人、友人、デート中、付き合っている、など"
-                      className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500"
+                      className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       趣味・好み
                     </label>
                     <textarea
@@ -982,12 +982,12 @@ export default function Home() {
                       onChange={(e) => setProfileInfo({ ...profileInfo, interests: e.target.value })}
                       placeholder="例: カフェ巡り、映画鑑賞、読書、スポーツ観戦など"
                       rows={2}
-                      className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500 resize-none"
+                      className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400 resize-none"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       性格・特徴
                     </label>
                     <textarea
@@ -995,12 +995,12 @@ export default function Home() {
                       onChange={(e) => setProfileInfo({ ...profileInfo, personality: e.target.value })}
                       placeholder="例: 明るい、控えめ、積極的、など"
                       rows={2}
-                      className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500 resize-none"
+                      className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400 resize-none"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       会話の文脈・背景
                     </label>
                     <textarea
@@ -1008,7 +1008,7 @@ export default function Home() {
                       onChange={(e) => setProfileInfo({ ...profileInfo, context: e.target.value })}
                       placeholder="例: 最近知り合った、共通の友人がいる、仕事関係、など"
                       rows={2}
-                      className="apple-tv-input w-full px-4 py-3 text-white rounded-xl placeholder:text-gray-500 resize-none"
+                      className="apple-tv-input w-full px-4 py-3 text-gray-800 rounded-xl placeholder:text-gray-400 resize-none"
                     />
                   </div>
                   
@@ -1025,10 +1025,10 @@ export default function Home() {
             
             <div>
               <div className="flex items-center justify-between mb-4">
-                <label className="block text-lg font-semibold text-white tracking-tight">
+                <label className="block text-lg font-semibold text-gray-800 tracking-tight">
                   彼女からのメッセージ
                 </label>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
                   <span className="flex items-center">
                     <MessageSquare className="w-4 h-4 mr-1" />
                     テキスト
@@ -1059,8 +1059,8 @@ export default function Home() {
                   htmlFor="image-upload"
                   className={`inline-flex items-center px-6 py-3.5 border rounded-full cursor-pointer transition-all duration-300 font-medium ${
                     (!user && !isDevMode) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)
-                      ? 'bg-gray-900 text-gray-500 cursor-not-allowed border-gray-800'
-                      : 'bg-gray-900/50 text-gray-200 hover:bg-gray-800/70 border-gray-700 hover:border-gray-600 active:scale-95'
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
+                      : 'bg-white text-gray-700 hover:bg-pink-50 border-gray-200 hover:border-pink-300 active:scale-95 shadow-sm'
                   }`}
                 >
                   <ImageIcon className="w-5 h-5 mr-3" />
@@ -1071,11 +1071,11 @@ export default function Home() {
                     <img
                       src={uploadedImage}
                       alt="アップロードされた画像"
-                      className="max-w-full h-auto max-h-80 rounded-2xl border border-gray-800 shadow-2xl"
+                      className="max-w-full h-auto max-h-80 rounded-2xl border border-gray-200 shadow-lg"
                     />
                     <button
                       onClick={handleRemoveImage}
-                      className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2 hover:bg-red-400 transition-all active:scale-95 shadow-xl"
+                      className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2 hover:bg-red-400 transition-all active:scale-95 shadow-lg"
                       disabled={isExtracting}
                     >
                       <X className="w-5 h-5" />
@@ -1083,22 +1083,22 @@ export default function Home() {
                   </div>
                 )}
                 {isExtracting && (
-                  <div className="mt-4 flex items-center text-blue-400">
+                  <div className="mt-4 flex items-center text-pink-500">
                     <Loader2 className="w-5 h-5 mr-3 animate-spin" />
                     <span className="text-base font-medium">画像からテキストを抽出中...</span>
                   </div>
                 )}
                 {fullConversationText && (
-                  <div className="mt-6 p-6 bg-gray-900/50 rounded-2xl border border-gray-800">
-                    <p className="text-sm text-gray-400 mb-3 font-medium">📝 会話全体を読み取りました（返信生成時に使用されます）</p>
-                    <div className="text-sm text-gray-300 max-h-[300px] min-h-[50px] overflow-y-auto overflow-x-hidden break-words whitespace-pre-wrap leading-relaxed pr-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                  <div className="mt-6 p-6 bg-pink-50/50 rounded-2xl border border-pink-100">
+                    <p className="text-sm text-gray-600 mb-3 font-medium">📝 会話全体を読み取りました（返信生成時に使用されます）</p>
+                    <div className="text-sm text-gray-700 max-h-[300px] min-h-[50px] overflow-y-auto overflow-x-hidden break-words whitespace-pre-wrap leading-relaxed pr-3 scrollbar-thin">
                       <div className="pb-2">
                         {fullConversationText}
                       </div>
                     </div>
                     <button
                       onClick={() => setFullConversationText('')}
-                      className="mt-4 text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                      className="mt-4 text-sm text-pink-500 hover:text-pink-600 transition-colors font-medium"
                     >
                       クリア
                     </button>
@@ -1111,7 +1111,7 @@ export default function Home() {
                   value={herMessage}
                   onChange={(e) => setHerMessage(e.target.value)}
                   placeholder="例: おはよう！今日は何してる？"
-                  className="apple-tv-input w-full px-6 py-4 pr-14 text-white rounded-2xl resize-none placeholder:text-gray-500 text-lg"
+                  className="apple-tv-input w-full px-6 py-4 pr-14 text-gray-800 rounded-2xl resize-none placeholder:text-gray-400 text-lg"
                   rows={5}
                   disabled={(!user && !isDevMode) || isLoading || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                 />
@@ -1123,8 +1123,8 @@ export default function Home() {
                     isListening
                       ? 'bg-red-500 text-white hover:bg-red-400'
                       : isSpeechSupported
-                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                      : 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                      ? 'bg-pink-100 text-pink-600 hover:bg-pink-200'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   } disabled:opacity-50 disabled:cursor-not-allowed active:scale-95`}
                   title={
                     !isSpeechSupported
@@ -1142,7 +1142,7 @@ export default function Home() {
                 </button>
               </div>
               {isListening && (
-                <p className="mt-4 text-base text-blue-400 flex items-center font-medium">
+                <p className="mt-4 text-base text-pink-500 flex items-center font-medium">
                   <span className="inline-block w-2.5 h-2.5 bg-red-500 rounded-full mr-3 animate-pulse"></span>
                   音声を聞いています...
                 </p>
@@ -1151,27 +1151,27 @@ export default function Home() {
 
             <div className="space-y-3">
               {usageInfo && !isDevMode && usageInfo.remaining <= 5 && usageInfo.remaining > 0 && (
-                <div className="p-4 bg-yellow-900/30 border border-yellow-800/50 rounded-xl text-yellow-300">
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-700">
                   <p className="text-sm font-medium mb-2">
                     ⚠️ 残り使用回数が少なくなっています: {usageInfo.remaining}回（制限: {usageInfo.limit}回/日）
                   </p>
                   <button
                     onClick={() => setShowUpgradeModal(true)}
-                    className="text-xs underline hover:no-underline text-yellow-400"
+                    className="text-xs underline hover:no-underline text-yellow-600"
                   >
                     追加課金で使用回数を増やす
                   </button>
                 </div>
               )}
               {usageInfo && !isDevMode && usageInfo.remaining === 0 && (
-                <div className="p-5 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-xl">
+                <div className="p-5 bg-gradient-to-r from-pink-50 to-coral-50 border border-pink-200 rounded-xl">
                   <div className="flex items-start">
-                    <Zap className="w-6 h-6 text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
+                    <Zap className="w-6 h-6 text-pink-500 mr-3 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-white font-bold mb-1">
+                      <p className="text-gray-800 font-bold mb-1">
                         今日の無料アドバイスを使い切りました
                       </p>
-                      <p className="text-sm text-gray-400 mb-3">
+                      <p className="text-sm text-gray-600 mb-3">
                         {usageInfo.limit === 3 ? (
                           <>プロプランにアップグレードすると、1日50回まで使えます</>
                         ) : (
@@ -1180,7 +1180,7 @@ export default function Home() {
                       </p>
                       <button
                         onClick={() => setShowUpgradeModal(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full text-sm hover:from-blue-400 hover:to-purple-400 transition-all active:scale-95"
+                        className="px-4 py-2 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full text-sm hover:from-pink-400 hover:to-coral-400 transition-all active:scale-95"
                       >
                         アップグレードする
                       </button>
@@ -1208,7 +1208,7 @@ export default function Home() {
               <>
                 <div className="mt-10 fade-in-up" style={{ animationDelay: '0.3s' }}>
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-bold text-white tracking-tight gradient-text">返信候補（3案）</h3>
+                    <h3 className="text-2xl font-bold text-gray-800 tracking-tight">返信候補（3案）</h3>
                     <button
                       onClick={async () => {
                         setIsLoading(true);
@@ -1233,7 +1233,7 @@ export default function Home() {
                           setIsLoading(false);
                         }
                       }}
-                      className="flex items-center px-4 py-2 bg-gray-800/50 border border-gray-700/50 text-gray-300 rounded-full hover:bg-gray-700/50 transition-all text-sm"
+                      className="flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-pink-50 hover:border-pink-200 transition-all text-sm shadow-sm"
                       disabled={isLoading}
                     >
                       <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -1246,24 +1246,24 @@ export default function Home() {
                     {/* メインの返信候補（候補1） */}
                     <div className={`p-6 rounded-xl border transition-all ${
                       selectedResponseIndex === null
-                        ? 'bg-blue-900/30 border-blue-500/50'
-                        : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50'
+                        ? 'bg-pink-50/70 border-pink-200'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
                     }`}>
                       <div className="mb-3">
-                        <p className="text-xs text-gray-400 mb-2 font-medium">候補1</p>
-                        <p className="text-gray-100 whitespace-pre-wrap text-lg font-medium mb-3">{aiResponse}</p>
+                        <p className="text-xs text-pink-500 mb-2 font-medium">候補1</p>
+                        <p className="text-gray-800 whitespace-pre-wrap text-lg font-medium mb-3">{aiResponse}</p>
                       </div>
-                      <div className="pt-3 border-t border-gray-700/50">
-                        <p className="text-sm text-gray-400 mb-2 font-medium">📝 解説</p>
-                        <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{aiExplanation}</p>
+                      <div className="pt-3 border-t border-pink-100">
+                        <p className="text-sm text-gray-500 mb-2 font-medium">📝 解説</p>
+                        <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{aiExplanation}</p>
                       </div>
-                      <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-pink-100">
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(aiResponse);
                             alert('クリップボードにコピーしました');
                           }}
-                          className="flex-1 px-4 py-2 bg-gray-800/80 border border-gray-700/50 text-gray-200 rounded-full hover:bg-gray-700/80 hover:border-gray-600 transition-all active:scale-95 text-sm font-medium"
+                          className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-pink-50 hover:border-pink-200 transition-all active:scale-95 text-sm font-medium shadow-sm"
                         >
                           コピー
                         </button>
@@ -1291,7 +1291,7 @@ export default function Home() {
                                 alert('評価を保存しました');
                               }
                             }}
-                            className="px-3 py-2 bg-green-900/30 border border-green-800/50 text-green-300 rounded-full hover:bg-green-900/40 transition-all active:scale-95"
+                            className="px-3 py-2 bg-green-50 border border-green-200 text-green-600 rounded-full hover:bg-green-100 transition-all active:scale-95"
                             title="この返信が良かった"
                           >
                             <ThumbsUp className="w-4 h-4" />
@@ -1304,7 +1304,7 @@ export default function Home() {
                             localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
                             alert('評価を保存しました。改善に活用します。');
                           }}
-                          className="px-3 py-2 bg-red-900/30 border border-red-800/50 text-red-300 rounded-full hover:bg-red-900/40 transition-all active:scale-95"
+                          className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-full hover:bg-red-100 transition-all active:scale-95"
                           title="この返信を改善したい"
                         >
                           <ThumbsDown className="w-4 h-4" />
@@ -1318,25 +1318,25 @@ export default function Home() {
                         key={idx}
                         className={`p-6 rounded-xl border transition-all ${
                           selectedResponseIndex === idx
-                            ? 'bg-blue-900/30 border-blue-500/50'
-                            : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50'
+                            ? 'bg-pink-50/70 border-pink-200'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
                         }`}
                       >
                         <div className="mb-3">
-                          <p className="text-xs text-gray-400 mb-2 font-medium">候補{idx + 2}</p>
-                          <p className="text-gray-100 whitespace-pre-wrap text-lg font-medium mb-3">{alt.response}</p>
+                          <p className="text-xs text-gray-500 mb-2 font-medium">候補{idx + 2}</p>
+                          <p className="text-gray-800 whitespace-pre-wrap text-lg font-medium mb-3">{alt.response}</p>
                         </div>
-                        <div className="pt-3 border-t border-gray-700/50">
-                          <p className="text-sm text-gray-400 mb-2 font-medium">📝 解説</p>
-                          <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{alt.explanation}</p>
+                        <div className="pt-3 border-t border-gray-100">
+                          <p className="text-sm text-gray-500 mb-2 font-medium">📝 解説</p>
+                          <p className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">{alt.explanation}</p>
                         </div>
-                        <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-700/50">
+                        <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-100">
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(alt.response);
                               alert('クリップボードにコピーしました');
                             }}
-                            className="flex-1 px-4 py-2 bg-gray-800/80 border border-gray-700/50 text-gray-200 rounded-full hover:bg-gray-700/80 hover:border-gray-600 transition-all active:scale-95 text-sm font-medium"
+                            className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-pink-50 hover:border-pink-200 transition-all active:scale-95 text-sm font-medium shadow-sm"
                           >
                             コピー
                           </button>
@@ -1348,7 +1348,7 @@ export default function Home() {
                               localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
                               alert('評価を保存しました');
                             }}
-                            className="px-3 py-2 bg-green-900/30 border border-green-800/50 text-green-300 rounded-full hover:bg-green-900/40 transition-all active:scale-95"
+                            className="px-3 py-2 bg-green-50 border border-green-200 text-green-600 rounded-full hover:bg-green-100 transition-all active:scale-95"
                             title="この返信が良かった"
                           >
                             <ThumbsUp className="w-4 h-4" />
@@ -1361,7 +1361,7 @@ export default function Home() {
                               localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
                               alert('評価を保存しました。改善に活用します。');
                             }}
-                            className="px-3 py-2 bg-red-900/30 border border-red-800/50 text-red-300 rounded-full hover:bg-red-900/40 transition-all active:scale-95"
+                            className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-full hover:bg-red-100 transition-all active:scale-95"
                             title="この返信を改善したい"
                           >
                             <ThumbsDown className="w-4 h-4" />
@@ -1379,11 +1379,11 @@ export default function Home() {
 
       {/* 追加課金モーダル */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-white mb-4">使用回数を増やす</h3>
-            <p className="text-gray-400 mb-4">
-              現在の制限: <span className="font-bold text-white">{usageInfo?.limit || 50}回/日</span>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">使用回数を増やす</h3>
+            <p className="text-gray-600 mb-4">
+              現在の制限: <span className="font-bold text-gray-800">{usageInfo?.limit || 50}回/日</span>
             </p>
             <p className="text-gray-500 text-sm mb-6">
               ※ 追加課金は現在のプラン（月額/年額）に合わせて適用されます
@@ -1421,14 +1421,14 @@ export default function Home() {
                     alert('エラーが発生しました');
                   }
                 }}
-                className="w-full p-4 bg-blue-900/30 border border-blue-800/50 rounded-xl text-left hover:bg-blue-900/40 transition-colors"
+                className="w-full p-4 bg-pink-50 border border-pink-200 rounded-xl text-left hover:bg-pink-100 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-white">100回/日プラン</p>
-                    <p className="text-sm text-gray-400">月額 +¥6,980</p>
+                    <p className="font-bold text-gray-800">100回/日プラン</p>
+                    <p className="text-sm text-gray-500">月額 +¥6,980</p>
                   </div>
-                  <span className="text-blue-400 font-bold">+50回</span>
+                  <span className="text-pink-500 font-bold">+50回</span>
                 </div>
               </button>
 
@@ -1461,14 +1461,14 @@ export default function Home() {
                     alert('エラーが発生しました');
                   }
                 }}
-                className="w-full p-4 bg-green-900/30 border border-green-800/50 rounded-xl text-left hover:bg-green-900/40 transition-colors"
+                className="w-full p-4 bg-green-50 border border-green-200 rounded-xl text-left hover:bg-green-100 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-white">150回/日プラン</p>
-                    <p className="text-sm text-gray-400">月額 +¥13,960（2倍）</p>
+                    <p className="font-bold text-gray-800">150回/日プラン</p>
+                    <p className="text-sm text-gray-500">月額 +¥13,960（2倍）</p>
                   </div>
-                  <span className="text-green-400 font-bold">+100回</span>
+                  <span className="text-green-600 font-bold">+100回</span>
                 </div>
               </button>
 
@@ -1501,14 +1501,14 @@ export default function Home() {
                     alert('エラーが発生しました');
                   }
                 }}
-                className="w-full p-4 bg-purple-900/30 border border-purple-800/50 rounded-xl text-left hover:bg-purple-900/40 transition-colors"
+                className="w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-left hover:bg-purple-100 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-white">200回/日プラン</p>
-                    <p className="text-sm text-gray-400">月額 +¥20,940（3倍）</p>
+                    <p className="font-bold text-gray-800">200回/日プラン</p>
+                    <p className="text-sm text-gray-500">月額 +¥20,940（3倍）</p>
                   </div>
-                  <span className="text-purple-400 font-bold">+150回</span>
+                  <span className="text-purple-600 font-bold">+150回</span>
                 </div>
               </button>
 
@@ -1541,21 +1541,21 @@ export default function Home() {
                     alert('エラーが発生しました');
                   }
                 }}
-                className="w-full p-4 bg-yellow-900/30 border border-yellow-800/50 rounded-xl text-left hover:bg-yellow-900/40 transition-colors"
+                className="w-full p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-left hover:bg-yellow-100 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-white">250回/日プラン</p>
-                    <p className="text-sm text-gray-400">月額 +¥27,920（4倍）</p>
+                    <p className="font-bold text-gray-800">250回/日プラン</p>
+                    <p className="text-sm text-gray-500">月額 +¥27,920（4倍）</p>
                   </div>
-                  <span className="text-yellow-400 font-bold">+200回</span>
+                  <span className="text-yellow-600 font-bold">+200回</span>
                 </div>
               </button>
             </div>
 
             <button
               onClick={() => setShowUpgradeModal(false)}
-              className="w-full p-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-colors"
+              className="w-full p-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors"
             >
               閉じる
             </button>
