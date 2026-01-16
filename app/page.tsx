@@ -590,10 +590,14 @@ export default function Home() {
     setRegisterError('');
 
     try {
+      // 紹介コードを取得（URLパラメータ または localStorage）
+      const urlParams = new URLSearchParams(window.location.search);
+      const referralCode = urlParams.get('ref') || localStorage.getItem('sendright_referral_code') || undefined;
+      
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: registerEmail }),
+        body: JSON.stringify({ email: registerEmail, referralCode }),
       });
 
       const data = await response.json();
