@@ -1,18 +1,34 @@
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 // AI Provider設定
-// DEEPSEEK_API_KEYがあればDeepSeek、なければOpenAIを使用
-const useDeepSeek = !!process.env.DEEPSEEK_API_KEY;
+// 優先順位: ANTHROPIC_API_KEY > DEEPSEEK_API_KEY > OPENAI_API_KEY
+const useAnthropic = !!process.env.ANTHROPIC_API_KEY;
+const useDeepSeek = !useAnthropic && !!process.env.DEEPSEEK_API_KEY;
 
+// OpenAI/DeepSeek client
 const openai = new OpenAI({
   apiKey: useDeepSeek ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY,
   baseURL: useDeepSeek ? 'https://api.deepseek.com' : undefined,
 });
 
+// Anthropic client
+const anthropic = useAnthropic ? new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+}) : null;
+
 // 使用するモデル
+// Claude: claude-3-5-haiku-20241022 (高速・安価・デフォルト) or claude-3-5-sonnet-20241022 (高品質)
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
 const AI_MODEL = useDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini';
 
-console.log(`AI Provider: ${useDeepSeek ? 'DeepSeek V3' : 'OpenAI GPT-4o-mini'}`);
+const providerName = useAnthropic 
+  ? `Anthropic ${CLAUDE_MODEL}` 
+  : useDeepSeek 
+    ? 'DeepSeek V3' 
+    : 'OpenAI GPT-4o-mini';
+
+console.log(`AI Provider: ${providerName}`);
 
 export interface MessageContext {
   herMessage: string;
@@ -293,24 +309,57 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
   });
 
   try {
-    // メインの返信生成
-    const completion = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages,
-      temperature: 0.85, // 自然な会話のために少し上げる（0.7→0.85）
-      max_tokens: 500, // 返信（1-2文）と解説を含む（解説が切れないように増加：250→500）
-    });
+    let content: string;
+    let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
 
-    const content = completion.choices[0]?.message?.content || '返信を生成できませんでした。';
-    
-    // トークン使用量をログに記録
-    const usage = completion.usage;
-    if (usage) {
-      console.log('メイン返信生成 - トークン使用量:', {
-        prompt_tokens: usage.prompt_tokens,
-        completion_tokens: usage.completion_tokens,
-        total_tokens: usage.total_tokens,
+    if (useAnthropic && anthropic) {
+      // Anthropic Claude API
+      const claudeMessages: Anthropic.MessageParam[] = messages
+        .filter(m => m.role !== 'system')
+        .map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content as string,
+        }));
+
+      const completion = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: claudeMessages,
       });
+
+      content = completion.content[0].type === 'text' 
+        ? completion.content[0].text 
+        : '返信を生成できませんでした。';
+      
+      usage = {
+        prompt_tokens: completion.usage.input_tokens,
+        completion_tokens: completion.usage.output_tokens,
+        total_tokens: completion.usage.input_tokens + completion.usage.output_tokens,
+      };
+      
+      if (usage) {
+        console.log('メイン返信生成 (Claude) - トークン使用量:', usage);
+      }
+    } else {
+      // OpenAI / DeepSeek API
+      const completion = await openai.chat.completions.create({
+        model: AI_MODEL,
+        messages,
+        temperature: 0.85,
+        max_tokens: 500,
+      });
+
+      content = completion.choices[0]?.message?.content || '返信を生成できませんでした。';
+      usage = completion.usage ? {
+        prompt_tokens: completion.usage.prompt_tokens,
+        completion_tokens: completion.usage.completion_tokens,
+        total_tokens: completion.usage.total_tokens,
+      } : undefined;
+      
+      if (usage) {
+        console.log('メイン返信生成 - トークン使用量:', usage);
+      }
     }
       
     // 返信と解説を分離
@@ -404,26 +453,56 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
 - 解説が途中で切れないように、必ず最後まで書き切ってください`;
 
       // 代替返信候補の生成
-      alternativeCompletion = await openai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: alternativePrompt }
-        ],
-        temperature: 0.9, // より多様性と自然さを持たせる（0.8→0.9）
-        max_tokens: 800, // 2つの候補と解説を含む（解説が切れないように増加：400→800）
-      });
+      let alternativeContent: string;
+      let altUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
 
-      const alternativeContent = alternativeCompletion.choices[0]?.message?.content || '';
-      
-      // トークン使用量をログに記録
-      const altUsage = alternativeCompletion.usage;
-      if (altUsage) {
-        console.log('代替返信生成 - トークン使用量:', {
-          prompt_tokens: altUsage.prompt_tokens,
-          completion_tokens: altUsage.completion_tokens,
-          total_tokens: altUsage.total_tokens,
+      if (useAnthropic && anthropic) {
+        // Anthropic Claude API
+        const altCompletion = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 800,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: alternativePrompt }],
         });
+
+        alternativeContent = altCompletion.content[0].type === 'text' 
+          ? altCompletion.content[0].text 
+          : '';
+        
+        altUsage = {
+          prompt_tokens: altCompletion.usage.input_tokens,
+          completion_tokens: altCompletion.usage.output_tokens,
+          total_tokens: altCompletion.usage.input_tokens + altCompletion.usage.output_tokens,
+        };
+        
+        if (altUsage) {
+          console.log('代替返信生成 (Claude) - トークン使用量:', altUsage);
+        }
+        
+        // alternativeCompletionを設定（合計トークン計算用）
+        alternativeCompletion = { usage: altUsage };
+      } else {
+        // OpenAI / DeepSeek API
+        alternativeCompletion = await openai.chat.completions.create({
+          model: AI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: alternativePrompt }
+          ],
+          temperature: 0.9,
+          max_tokens: 800,
+        });
+
+        alternativeContent = alternativeCompletion.choices[0]?.message?.content || '';
+        altUsage = alternativeCompletion.usage;
+        
+        if (altUsage) {
+          console.log('代替返信生成 - トークン使用量:', {
+            prompt_tokens: altUsage.prompt_tokens,
+            completion_tokens: altUsage.completion_tokens,
+            total_tokens: altUsage.total_tokens,
+          });
+        }
       }
       
       // デバッグ: 生成されたコンテンツの最初の500文字をログに記録

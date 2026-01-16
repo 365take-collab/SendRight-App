@@ -31,16 +31,49 @@ export default function ReferralPage() {
   useEffect(() => {
     const fetchReferralData = async () => {
       try {
-        // 認証情報を取得
-        const authRes = await fetch('/api/auth/me');
-        if (!authRes.ok) {
-          router.push('/login');
+        // localStorageからトークンを取得
+        const token = localStorage.getItem('token');
+        const savedUser = localStorage.getItem('sendright_user');
+        const savedEmail = localStorage.getItem('sendright_email');
+        
+        let userEmail = '';
+        
+        // savedUserがあればそこからemailを取得
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            userEmail = parsedUser.email;
+          } catch {
+            // パースに失敗した場合は無視
+          }
+        }
+        
+        // savedEmailがあればそれを使う
+        if (!userEmail && savedEmail) {
+          userEmail = savedEmail;
+        }
+        
+        // トークンがある場合は/api/auth/meで確認
+        if (token && !userEmail) {
+          const authRes = await fetch('/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          if (authRes.ok) {
+            const { user } = await authRes.json();
+            userEmail = user.email;
+          }
+        }
+        
+        // メールアドレスが取得できなかった場合はトップページにリダイレクト
+        if (!userEmail) {
+          router.push('/');
           return;
         }
-        const { user } = await authRes.json();
 
         // 紹介データを取得
-        const refRes = await fetch(`/api/referral?email=${encodeURIComponent(user.email)}`);
+        const refRes = await fetch(`/api/referral?email=${encodeURIComponent(userEmail)}`);
         if (refRes.ok) {
           const refData = await refRes.json();
           setData(refData);
