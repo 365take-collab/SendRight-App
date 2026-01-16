@@ -409,7 +409,7 @@ export async function recordReferral(referrerEmail: string, referredEmail: strin
 }
 
 // 紹介報酬を付与（有料転換時に呼ぶ）
-export async function grantReferralReward(referredEmail: string): Promise<{ success: boolean; reward?: number }> {
+export async function grantReferralReward(referredEmail: string): Promise<{ success: boolean; reward?: number; freeMonths?: number }> {
   try {
     // 紹介履歴を取得
     const { data: referral, error: refError } = await getSupabaseClient()
@@ -427,7 +427,7 @@ export async function grantReferralReward(referredEmail: string): Promise<{ succ
     // 紹介者の紹介数を更新
     const { data: referrer, error: referrerError } = await getSupabaseClient()
       .from('users')
-      .select('referral_count, referral_discount_percent')
+      .select('referral_count, referral_free_months')
       .eq('email', referral.referrer_email)
       .single();
 
@@ -435,24 +435,18 @@ export async function grantReferralReward(referredEmail: string): Promise<{ succ
       return { success: false };
     }
 
-    const newReferralCount = (referrer.referral_count || 0) + 1;
+    const oldReferralCount = referrer.referral_count || 0;
+    const newReferralCount = oldReferralCount + 1;
     
-    // 報酬計算（1人=10%, 2人=20%, 3人=50%, 5人=100%）
-    let newDiscount = 10;
-    if (newReferralCount >= 5) {
-      newDiscount = 100;
-    } else if (newReferralCount >= 3) {
-      newDiscount = 50;
-    } else if (newReferralCount >= 2) {
-      newDiscount = 20;
-    }
+    // 報酬計算（1人紹介につき1ヶ月無料、最大12ヶ月）
+    const newFreeMonths = Math.min(newReferralCount, 12);
 
     // 紹介者を更新
     await getSupabaseClient()
       .from('users')
       .update({
         referral_count: newReferralCount,
-        referral_discount_percent: newDiscount,
+        referral_free_months: newFreeMonths,
       })
       .eq('email', referral.referrer_email);
 
@@ -462,11 +456,21 @@ export async function grantReferralReward(referredEmail: string): Promise<{ succ
       .update({
         status: 'converted',
         converted_at: new Date().toISOString(),
-        reward_percent: newDiscount,
       })
       .eq('id', referral.id);
 
-    return { success: true, reward: newDiscount };
+    // 🎉 Utageに紹介特典メールを自動送信（3人、5人、10人達成時）
+    const utageResult = await sendReferralBonusToUtage(
+      referral.referrer_email,
+      newReferralCount,
+      oldReferralCount
+    );
+    
+    if (utageResult.sent) {
+      console.log(`Utage bonus email sent for threshold ${utageResult.threshold}`);
+    }
+
+    return { success: true, freeMonths: newFreeMonths };
   } catch (error) {
     console.error('Error in grantReferralReward:', error);
     return { success: false };
@@ -503,4 +507,94 @@ export async function getReferralHistory(email: string): Promise<{ referrals: Db
 export function generateReferralLink(referralCode: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
   return `${baseUrl}?ref=${referralCode}`;
+}
+
+// ========================================
+// Utage自動連携（紹介特典メール送信）
+// ========================================
+
+// Utageフォーム設定
+const UTAGE_REFERRAL_FORMS: Record<number, { url: string; rid: string; bonusName: string }> = {
+  3: {
+    url: 'https://utage-system.com/r/PdimgvZMchyM/store',
+    rid: 'vOKY9xljNlf3',
+    bonusName: 'モテるLINEテクニック集',
+  },
+  5: {
+    url: 'https://utage-system.com/r/STxiepSXlIXU/store',
+    rid: 'vOKY9xljNlf3',
+    bonusName: 'デート成功率3倍マニュアル',
+  },
+  10: {
+    url: 'https://utage-system.com/r/V0C9cKJ3mO54/store',
+    rid: 'vOKY9xljNlf3',
+    bonusName: '1時間オンライン恋愛コンサル',
+  },
+};
+
+// Utageに紹介特典メールを送信
+export async function sendReferralBonusToUtage(
+  email: string,
+  newReferralCount: number,
+  oldReferralCount: number
+): Promise<{ sent: boolean; threshold?: number }> {
+  // 閾値をチェック（3, 5, 10）
+  const thresholds = [3, 5, 10];
+  
+  for (const threshold of thresholds) {
+    // 新しいカウントが閾値に達し、以前は達していなかった場合
+    if (newReferralCount >= threshold && oldReferralCount < threshold) {
+      const form = UTAGE_REFERRAL_FORMS[threshold];
+      
+      if (!form) continue;
+      
+      try {
+        // 既に送信済みかチェック
+        const { data: existingBonus } = await getSupabaseClient()
+          .from('sendright_referral_bonuses')
+          .select('id')
+          .eq('user_email', email)
+          .eq('bonus_type', `bonus_${threshold}`)
+          .single();
+        
+        if (existingBonus) {
+          console.log(`Already sent bonus_${threshold} to ${email}`);
+          continue;
+        }
+        
+        // Utageにフォーム送信
+        const formData = new URLSearchParams();
+        formData.append('mail', email);
+        formData.append('rid', form.rid);
+        
+        const response = await fetch(form.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData.toString(),
+        });
+        
+        console.log(`Utage form submission for ${email} at threshold ${threshold}:`, response.status);
+        
+        // 送信履歴を記録
+        await getSupabaseClient()
+          .from('sendright_referral_bonuses')
+          .insert({
+            user_email: email,
+            bonus_type: `bonus_${threshold}`,
+            bonus_name: form.bonusName,
+            delivery_method: 'utage_auto',
+          });
+        
+        console.log(`Sent referral bonus (${threshold}) to ${email} via Utage`);
+        
+        return { sent: true, threshold };
+      } catch (error) {
+        console.error(`Error sending to Utage for ${email} at threshold ${threshold}:`, error);
+      }
+    }
+  }
+  
+  return { sent: false };
 }

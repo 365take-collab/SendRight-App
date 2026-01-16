@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit } from '@/lib/api';
-import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap } from 'lucide-react';
+import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, Gift } from 'lucide-react';
 import OnboardingModal from '@/app/components/OnboardingModal';
 import Dashboard from '@/app/components/Dashboard';
 import { recordSuccess } from '@/lib/api';
@@ -808,6 +808,15 @@ export default function Home() {
                     会員登録
                   </button>
                 )
+              )}
+              {!isDevMode && user && (
+                <Link
+                  href="/referral"
+                  className="flex items-center text-gray-600 hover:text-pink-500 transition-colors font-medium"
+                >
+                  <Gift className="w-5 h-5 mr-2" />
+                  紹介で割引
+                </Link>
               )}
               {!isDevMode && (
                 <button
