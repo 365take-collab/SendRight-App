@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByEmail, createUser } from '@/lib/supabase';
+import { findUserByEmail, createUser, validateReferralCode, recordReferral } from '@/lib/supabase';
 
 // 無料プランの制限
 const FREE_PLAN_DAILY_LIMIT = 3;
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email } = await req.json();
+    const { email, referralCode } = await req.json();
 
     // メールアドレスのバリデーション
     if (!email || !isValidEmail(email)) {
@@ -111,6 +111,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 紹介コードがある場合、紹介を記録
+    let referralMessage = '';
+    if (referralCode) {
+      const validation = await validateReferralCode(referralCode);
+      if (validation.valid && validation.referrerEmail) {
+        const recorded = await recordReferral(
+          validation.referrerEmail,
+          normalizedEmail,
+          referralCode
+        );
+        if (recorded) {
+          referralMessage = '紹介特典でトライアル期間が14日間に延長されました！';
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       isNew: true,
@@ -120,7 +136,8 @@ export async function POST(req: NextRequest) {
         isSubscribed: newUser.is_subscribed,
         dailyUsageLimit: newUser.daily_usage_limit,
       },
-      message: 'メールアドレスを登録しました！1日3回まで無料でお使いいただけます。',
+      message: referralMessage || 'メールアドレスを登録しました！1日3回まで無料でお使いいただけます。',
+      isReferred: !!referralMessage,
     });
 
   } catch (error) {

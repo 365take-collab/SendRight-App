@@ -315,3 +315,192 @@ export async function recordUsage(userId: string): Promise<{ totalUsageCount: nu
     newBadges,
   };
 }
+
+// ========================================
+// 紹介システム関連
+// ========================================
+
+export interface DbReferral {
+  id: string;
+  referrer_email: string;
+  referred_email: string;
+  referral_code: string;
+  status: string;
+  reward_percent: number;
+  created_at: string;
+  converted_at: string | null;
+  notes: string | null;
+}
+
+// 紹介コード生成（完全ランダム8文字）
+function generateReferralCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// 紹介コードを取得（なければ生成）
+export async function getReferralCode(email: string): Promise<string | null> {
+  const user = await findUserByEmail(email);
+  if (!user) return null;
+
+  // 既に紹介コードがあればそれを返す
+  if ((user as any).referral_code) {
+    return (user as any).referral_code;
+  }
+
+  // なければ生成して保存
+  const newCode = generateReferralCode();
+  await getSupabaseClient()
+    .from('users')
+    .update({ referral_code: newCode })
+    .eq('email', email);
+
+  return newCode;
+}
+
+// 紹介コードが有効かチェック
+export async function validateReferralCode(code: string): Promise<{ valid: boolean; referrerEmail?: string }> {
+  const { data, error } = await getSupabaseClient()
+    .from('users')
+    .select('email')
+    .eq('referral_code', code)
+    .single();
+
+  if (error || !data) {
+    return { valid: false };
+  }
+
+  return { valid: true, referrerEmail: data.email };
+}
+
+// 紹介を記録（新規登録時に呼ぶ）
+export async function recordReferral(referrerEmail: string, referredEmail: string, referralCode: string): Promise<boolean> {
+  try {
+    // 紹介履歴を保存
+    const { error: insertError } = await getSupabaseClient()
+      .from('sendright_referrals')
+      .insert([{
+        referrer_email: referrerEmail,
+        referred_email: referredEmail,
+        referral_code: referralCode,
+        status: 'registered',
+      }]);
+
+    if (insertError) {
+      console.error('Error recording referral:', insertError);
+      return false;
+    }
+
+    // 紹介された人の referred_by を更新
+    await getSupabaseClient()
+      .from('users')
+      .update({ referred_by: referralCode })
+      .eq('email', referredEmail);
+
+    return true;
+  } catch (error) {
+    console.error('Error in recordReferral:', error);
+    return false;
+  }
+}
+
+// 紹介報酬を付与（有料転換時に呼ぶ）
+export async function grantReferralReward(referredEmail: string): Promise<{ success: boolean; reward?: number }> {
+  try {
+    // 紹介履歴を取得
+    const { data: referral, error: refError } = await getSupabaseClient()
+      .from('sendright_referrals')
+      .select('*')
+      .eq('referred_email', referredEmail)
+      .eq('status', 'registered')
+      .single();
+
+    if (refError || !referral) {
+      // 紹介経由ではない
+      return { success: false };
+    }
+
+    // 紹介者の紹介数を更新
+    const { data: referrer, error: referrerError } = await getSupabaseClient()
+      .from('users')
+      .select('referral_count, referral_discount_percent')
+      .eq('email', referral.referrer_email)
+      .single();
+
+    if (referrerError || !referrer) {
+      return { success: false };
+    }
+
+    const newReferralCount = (referrer.referral_count || 0) + 1;
+    
+    // 報酬計算（1人=10%, 2人=20%, 3人=50%, 5人=100%）
+    let newDiscount = 10;
+    if (newReferralCount >= 5) {
+      newDiscount = 100;
+    } else if (newReferralCount >= 3) {
+      newDiscount = 50;
+    } else if (newReferralCount >= 2) {
+      newDiscount = 20;
+    }
+
+    // 紹介者を更新
+    await getSupabaseClient()
+      .from('users')
+      .update({
+        referral_count: newReferralCount,
+        referral_discount_percent: newDiscount,
+      })
+      .eq('email', referral.referrer_email);
+
+    // 紹介履歴を更新
+    await getSupabaseClient()
+      .from('sendright_referrals')
+      .update({
+        status: 'converted',
+        converted_at: new Date().toISOString(),
+        reward_percent: newDiscount,
+      })
+      .eq('id', referral.id);
+
+    return { success: true, reward: newDiscount };
+  } catch (error) {
+    console.error('Error in grantReferralReward:', error);
+    return { success: false };
+  }
+}
+
+// 紹介履歴を取得
+export async function getReferralHistory(email: string): Promise<{ referrals: DbReferral[]; totalCount: number; currentDiscount: number }> {
+  const { data: referrals, error } = await getSupabaseClient()
+    .from('sendright_referrals')
+    .select('*')
+    .eq('referrer_email', email)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching referral history:', error);
+    return { referrals: [], totalCount: 0, currentDiscount: 0 };
+  }
+
+  const { data: user } = await getSupabaseClient()
+    .from('users')
+    .select('referral_count, referral_discount_percent')
+    .eq('email', email)
+    .single();
+
+  return {
+    referrals: referrals || [],
+    totalCount: user?.referral_count || 0,
+    currentDiscount: user?.referral_discount_percent || 0,
+  };
+}
+
+// 紹介リンクを生成
+export function generateReferralLink(referralCode: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
+  return `${baseUrl}?ref=${referralCode}`;
+}

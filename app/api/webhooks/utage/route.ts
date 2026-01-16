@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createOrUpdateUserFromUtage } from '@/lib/auth'
+import { grantReferralReward } from '@/lib/supabase'
 import crypto from 'crypto'
 
 // 定数時間比較（タイミングアタック対策）
@@ -316,6 +317,22 @@ export async function POST(request: NextRequest) {
         dailyUsageLimit: user.dailyUsageLimit,
       })
 
+      // 紹介報酬を付与（紹介経由で登録したユーザーが有料転換した場合）
+      let referralReward = null;
+      try {
+        const rewardResult = await grantReferralReward(userEmail);
+        if (rewardResult.success) {
+          referralReward = rewardResult.reward;
+          console.log('Referral reward granted:', {
+            referredEmail: userEmail,
+            rewardPercent: referralReward,
+          });
+        }
+      } catch (refError) {
+        console.error('Error granting referral reward:', refError);
+        // エラーが発生しても続行
+      }
+
       return NextResponse.json({
         received: true,
         action: 'user_created_or_upgraded',
@@ -323,6 +340,7 @@ export async function POST(request: NextRequest) {
         isSubscribed: user.isSubscribed,
         dailyUsageLimit: user.dailyUsageLimit,
         limitUpdated: !!newLimit,
+        referralReward,
       })
     } catch (error) {
       console.error('Error creating or updating user:', error)
