@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage, BADGES, PLAN_LIMITS } from '@/lib/auth';
 import { findUserById as findUserByIdFromSupabase } from '@/lib/supabase';
-import { generateResponse } from '@/lib/ai';
+import { generateResponse, generateGoalDrivenResponse, GOALS } from '@/lib/ai';
 import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, checkIPWhitelist, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
 import { z } from 'zod';
 
@@ -13,6 +13,7 @@ const generateSchema = z.object({
   })).optional(),
   fullConversationText: z.string().optional(), // 画像から抽出した会話全体のテキスト
   profileContext: z.string().optional(), // 前提情報（名前、年齢、関係性など）
+  goal: z.string().optional(), // ゴール（デートに誘いたい、LINE交換したい、など）
 });
 
 export async function POST(request: NextRequest) {
@@ -22,10 +23,32 @@ export async function POST(request: NextRequest) {
                       request.nextUrl.hostname === 'localhost' ||
                       request.nextUrl.hostname.includes('ngrok');
 
-    // 認証チェック（開発環境ではスキップ）
+    // 開発環境ではすべてのセキュリティチェックをスキップ
+    if (isDevMode) {
+      // 開発環境: ダミーユーザーを設定してすべてのチェックをスキップ
+      const devUser = {
+        id: 'dev-user',
+        email: 'dev@example.com',
+        isSubscribed: true,
+        subscriptionType: 'pro' as const,
+        isUtageUser: false,
+        dailyUsageLimit: 999999,
+        currentStreak: 0,
+        longestStreak: 0,
+        badges: [],
+        totalUsageCount: 0,
+        successCount: 0,
+        level: 1,
+        createdAt: new Date(),
+      };
+      
+      // 開発環境ではすべてのチェックをスキップして処理を続行
+      // 後続の処理で user 変数を使用するため、ここで設定
+      var user = devUser;
+    } else {
+    // 認証チェック（本番環境のみ）
     // 注意: refererやIPチェックは削除。認証トークンがあれば十分。
     // メールからのログインユーザーも使えるようにする。
-    if (!isDevMode) {
       // Check authentication
       const authHeader = request.headers.get('authorization');
       if (!authHeader?.startsWith('Bearer ')) {
@@ -176,29 +199,34 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出（埋め込みモードではスキップ）
-      if (!isEmbedToken && detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now())) {
-        console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname });
-        return NextResponse.json(
-          { error: '異常なアクセスパターンが検出されました' },
-          { status: 403 }
-        );
+      // 異常なアクセスパターンを検出（埋め込みモード・開発環境ではスキップ）
+      if (!isDevMode && !isEmbedToken) {
+        const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
+        if (anomalyResult.isAnomalous) {
+          console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
+          return NextResponse.json(
+            { error: '異常なアクセスパターンが検出されました' },
+            { status: 403 }
+          );
+        }
       }
 
       // 使用回数を事前にカウント（AI生成前に）
-      // これにより、コピー&ペーストや開発者ツールでの直接呼び出しでも確実にカウントされる
-      await incrementUsageCount(user.id);
-      
-      // ストリークを更新
-      const streakResult = await updateStreak(user.id);
-      
-      // 統計を記録（総使用回数、レベル、バッジ）
-      const usageResult = await recordUsage(user.id);
-      
-      // 新しいバッジがあればログに記録
-      const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
-      if (allNewBadges.length > 0) {
-        console.log(`User ${user.id} earned new badges:`, allNewBadges);
+      // 開発環境ではスキップ
+      if (!isDevMode) {
+        await incrementUsageCount(user.id);
+        
+        // ストリークを更新
+        const streakResult = await updateStreak(user.id);
+        
+        // 統計を記録（総使用回数、レベル、バッジ）
+        const usageResult = await recordUsage(user.id);
+        
+        // 新しいバッジがあればログに記録
+        const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
+        if (allNewBadges.length > 0) {
+          console.log(`User ${user.id} earned new badges:`, allNewBadges);
+        }
       }
     }
 
@@ -207,46 +235,68 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody);
 
     // リクエストの署名を検証（オプション、Utage側で署名を送信する場合）
-    const signature = request.headers.get('x-utage-signature');
-    const timestamp = request.headers.get('x-utage-timestamp');
-    const contentHash = request.headers.get('x-content-hash');
+    // 開発環境ではスキップ
+    if (!isDevMode) {
+      const signature = request.headers.get('x-utage-signature');
+      const timestamp = request.headers.get('x-utage-timestamp');
+      const contentHash = request.headers.get('x-content-hash');
 
-    if (signature && timestamp) {
-      if (!verifyRequestSignature(rawBody, signature, timestamp)) {
-        console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
-        return NextResponse.json(
-          { error: 'リクエストの署名が無効です' },
-          { status: 403 }
-        );
+      if (signature && timestamp) {
+        if (!verifyRequestSignature(rawBody, signature, timestamp)) {
+          console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
+          return NextResponse.json(
+            { error: 'リクエストの署名が無効です' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // リクエストの整合性をチェック（オプション）
+      if (contentHash) {
+        if (!verifyRequestIntegrity(rawBody, contentHash)) {
+          console.warn('リクエストの整合性チェックに失敗:', { contentHash });
+          return NextResponse.json(
+            { error: 'リクエストの整合性が確認できませんでした' },
+            { status: 403 }
+          );
+        }
       }
     }
-
-    // リクエストの整合性をチェック（オプション）
-    if (contentHash) {
-      if (!verifyRequestIntegrity(rawBody, contentHash)) {
-        console.warn('リクエストの整合性チェックに失敗:', { contentHash });
-        return NextResponse.json(
-          { error: 'リクエストの整合性が確認できませんでした' },
-          { status: 403 }
-        );
-      }
-    }
-    const { herMessage, conversationHistory, fullConversationText, profileContext } = generateSchema.parse(body);
+    const { herMessage, conversationHistory, fullConversationText, profileContext, goal } = generateSchema.parse(body);
 
     // Generate AI response
     let result;
+    let goalDrivenResult = null;
     let usageInfo = null;
     let streakInfo = null;
     let newBadges: string[] = [];
     let userStats = null;
     
     try {
-      result = await generateResponse({
-        herMessage,
-        conversationHistory,
-        fullConversationText, // 画像から抽出した会話全体のテキストを渡す
-        profileContext, // 前提情報を渡す
-      });
+      // ゴールが指定されている場合はゴール駆動型のレスポンスを生成
+      if (goal && GOALS.some(g => g.id === goal)) {
+        goalDrivenResult = await generateGoalDrivenResponse({
+          herMessage,
+          conversationHistory,
+          fullConversationText,
+          profileContext,
+          goal,
+        });
+        // 通常のレスポンス形式に変換（互換性のため）
+        result = {
+          response: goalDrivenResult.currentMessage,
+          explanation: goalDrivenResult.explanation,
+          alternatives: [],
+        };
+      } else {
+        // 通常のレスポンス生成
+        result = await generateResponse({
+          herMessage,
+          conversationHistory,
+          fullConversationText,
+          profileContext,
+        });
+      }
 
       // 使用回数情報・ストリーク・統計を取得（開発環境ではスキップ）
       if (!isDevMode) {
@@ -307,6 +357,12 @@ export async function POST(request: NextRequest) {
       usageInfo, // 使用回数情報を返す
       streakInfo, // ストリーク情報を返す
       userStats, // ユーザー統計情報を返す
+      // ゴール駆動型の場合、追加情報を返す
+      goalDriven: goalDrivenResult ? {
+        analysis: goalDrivenResult.analysis,
+        strategy: goalDrivenResult.strategy,
+        nextSteps: goalDrivenResult.nextSteps,
+      } : null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

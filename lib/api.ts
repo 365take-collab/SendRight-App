@@ -100,6 +100,39 @@ export interface Badge {
   description: string;
 }
 
+// ゴール選択肢
+export const GOALS = [
+  { id: 'date', label: 'デートに誘いたい', icon: '🍽️' },
+  { id: 'line', label: 'LINE交換したい', icon: '📱' },
+  { id: 'deepen', label: '関係を深めたい', icon: '💕' },
+  { id: 'second_date', label: '2回目のデートに誘いたい', icon: '🌟' },
+  { id: 'keep_contact', label: '連絡を途切れさせたくない', icon: '💬' },
+  { id: 'close', label: 'クロージングしたい', icon: '🔥' },
+] as const;
+
+export type GoalId = typeof GOALS[number]['id'];
+
+// ゴール駆動型の分析結果
+export interface GoalDrivenAnalysis {
+  temperature: number; // 1-10
+  distanceToGoal: 'close' | 'medium' | 'far';
+  timing: 'now' | 'soon' | 'not_yet';
+  summary: string;
+}
+
+// ゴール駆動型の次のステップ
+export interface NextStep {
+  condition: string;
+  response: string;
+}
+
+// ゴール駆動型の追加情報
+export interface GoalDrivenInfo {
+  analysis: GoalDrivenAnalysis;
+  strategy: string;
+  nextSteps: NextStep[];
+}
+
 export interface AIResponse {
   response: string;
   explanation: string;
@@ -107,6 +140,7 @@ export interface AIResponse {
   usageInfo?: UsageInfo; // 使用回数情報
   streakInfo?: StreakInfo; // ストリーク情報
   userStats?: Partial<UserStats>; // ユーザー統計情報
+  goalDriven?: GoalDrivenInfo | null; // ゴール駆動型の追加情報
 }
 
 export async function generateAIResponse(
@@ -115,7 +149,8 @@ export async function generateAIResponse(
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
   _tone?: 'casual' | 'friendly' | 'romantic' | 'playful', // 未使用（後方互換性のため残す）
   fullConversationText?: string, // 画像から抽出した会話全体のテキスト
-  profileContext?: string // 前提情報（名前、年齢、関係性など）
+  profileContext?: string, // 前提情報（名前、年齢、関係性など）
+  goal?: GoalId // ゴール（デートに誘いたい、LINE交換したい、など）
 ): Promise<AIResponse> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -129,7 +164,7 @@ export async function generateAIResponse(
   const response = await fetch('/api/generate-response', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ herMessage, conversationHistory, fullConversationText, profileContext }),
+    body: JSON.stringify({ herMessage, conversationHistory, fullConversationText, profileContext, goal }),
   });
 
   if (!response.ok) {
@@ -143,11 +178,12 @@ export async function generateAIResponse(
     explanation: data.explanation || '',
     alternatives: data.alternatives || [],
     usageInfo: data.usageInfo, // 使用回数情報を追加
+    goalDriven: data.goalDriven || null, // ゴール駆動型の追加情報
   };
 }
 
-export async function subscribe(token: string, plan: 'monthly' | 'yearly'): Promise<void> {
-  const response = await fetch('/api/subscribe', {
+export async function subscribe(token: string, plan: 'monthly' | 'yearly'): Promise<{ url: string }> {
+  const response = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -160,6 +196,8 @@ export async function subscribe(token: string, plan: 'monthly' | 'yearly'): Prom
     const error = await response.json();
     throw new Error(error.error || 'サブスクリプションの処理に失敗しました');
   }
+
+  return response.json();
 }
 
 export async function getUsageLimit(token: string): Promise<{ usageInfo: UsageInfo; dailyUsageLimit: number }> {

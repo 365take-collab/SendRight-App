@@ -1,10 +1,14 @@
 import Stripe from 'stripe';
 
-// Stripeはオプション（Utageで決済する場合は不要）
+// Stripe設定（必須）
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
+if (!stripeSecretKey) {
+  console.warn('STRIPE_SECRET_KEY is not set. Stripe features will be disabled.');
+}
+
 export const stripe = stripeSecretKey 
-  ? new Stripe(stripeSecretKey, { apiVersion: '2025-12-15.clover' })
+  ? new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' })
   : null;
 
 // Stripeが設定されていない場合のヘルパー

@@ -8,7 +8,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // ビルド時は環境変数がないためnullになる可能性がある
 let supabase: SupabaseClient | null = null;
 
-function getSupabaseClient(): SupabaseClient {
+export function getSupabaseClient(): SupabaseClient {
   if (!supabase) {
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase environment variables are not set');

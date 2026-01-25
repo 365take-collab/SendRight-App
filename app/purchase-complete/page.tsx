@@ -11,10 +11,27 @@ function PurchaseCompleteContent() {
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15分 = 900秒
   const [showConfetti, setShowConfetti] = useState(true);
   
-  const plan = searchParams.get('plan') || 'pro';
-  const email = searchParams.get('email') || '';
+  const sessionId = searchParams.get('session_id');
+  const plan = searchParams.get('plan') || 'monthly';
 
   useEffect(() => {
+    // Stripe Checkoutから戻ってきた場合、ユーザー情報を更新
+    if (sessionId) {
+      // ユーザー情報を再取得
+      const token = localStorage.getItem('token');
+      if (token) {
+        fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            // ユーザー情報が更新されたことを確認
+            console.log('User updated:', data);
+          })
+          .catch((err) => console.error('Failed to refresh user:', err));
+      }
+    }
+
     // カウントダウンタイマー
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -30,15 +47,31 @@ function PurchaseCompleteContent() {
     setTimeout(() => setShowConfetti(false), 3000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [sessionId]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
   const handleUpgrade = () => {
-    // Utageのアップセル決済ページにリダイレクト
-    const upsellUrl = process.env.NEXT_PUBLIC_UTAGE_UPSELL_URL || '/subscribe?upgrade=true';
-    window.location.href = upsellUrl;
+    // Stripe Checkoutでアップグレード（年額プランに変更）
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan: 'yearly' }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.url) {
+            window.location.href = data.url;
+          }
+        })
+        .catch((err) => console.error('Failed to upgrade:', err));
+    }
   };
 
   const handleSkip = () => {
@@ -83,7 +116,7 @@ function PurchaseCompleteContent() {
             🎉 ご購入ありがとうございます！
           </h1>
           <p className="text-xl text-gray-300">
-            SendRight {plan === 'premium' ? 'プレミアム' : 'プロ'}プランへようこそ
+            SendRight {plan === 'yearly' ? '年額' : '月額'}プランへようこそ
           </p>
         </div>
 

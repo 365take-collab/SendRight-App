@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit } from '@/lib/api';
-import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, Gift } from 'lucide-react';
+import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit, GOALS, GoalId, GoalDrivenInfo } from '@/lib/api';
+import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, Gift, Target } from 'lucide-react';
 import OnboardingModal from '@/app/components/OnboardingModal';
 import Dashboard from '@/app/components/Dashboard';
 import { recordSuccess } from '@/lib/api';
@@ -35,6 +35,9 @@ export default function Home() {
   const [alternativeResponses, setAlternativeResponses] = useState<AlternativeResponse[]>([]);
   const [selectedResponseIndex, setSelectedResponseIndex] = useState<number | null>(null);
   const [usageInfo, setUsageInfo] = useState<{ todayCount: number; limit: number; remaining: number } | null>(null);
+  // ゴール駆動型の状態
+  const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
+  const [goalDrivenInfo, setGoalDrivenInfo] = useState<GoalDrivenInfo | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,6 +305,7 @@ export default function Home() {
     setError('');
     setAiResponse('');
     setAiExplanation('');
+    setGoalDrivenInfo(null);
 
     try {
       // 前提情報を文字列に変換
@@ -316,12 +320,17 @@ export default function Home() {
         undefined, // 会話履歴は使わない
         undefined, // toneは使わない
         fullConversationText || undefined, // 画像から抽出した会話全体のテキストを渡す
-        profileContext // 前提情報を渡す
+        profileContext, // 前提情報を渡す
+        selectedGoal || undefined // ゴールを渡す
       );
       setAiResponse(result.response);
       setAiExplanation(result.explanation);
       setAlternativeResponses(result.alternatives || []);
       setSelectedResponseIndex(null);
+      // ゴール駆動型の情報を設定
+      if (result.goalDriven) {
+        setGoalDrivenInfo(result.goalDriven);
+      }
       
       // 使用回数情報を更新
       if (result.usageInfo) {
@@ -509,17 +518,22 @@ export default function Home() {
                 ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
                 : undefined;
               
-              const responseResult = await generateAIResponse(
-                token || 'dev-token', 
-                result.message, 
-                undefined,
-                undefined,
-                result.extractedText || undefined,
-                profileContext
-              );
-              setAiResponse(responseResult.response);
-              setAiExplanation(responseResult.explanation);
-              setAlternativeResponses(responseResult.alternatives || []);
+                          const responseResult = await generateAIResponse(
+                            token || 'dev-token', 
+                            result.message, 
+                            undefined,
+                            undefined,
+                            result.extractedText || undefined,
+                            profileContext,
+                            selectedGoal || undefined // ゴールを渡す
+                          );
+                          setAiResponse(responseResult.response);
+                          setAiExplanation(responseResult.explanation);
+                          setAlternativeResponses(responseResult.alternatives || []);
+                          // ゴール駆動型の情報を設定
+                          if (responseResult.goalDriven) {
+                            setGoalDrivenInfo(responseResult.goalDriven);
+                          }
             } catch (err) {
               setError(err instanceof Error ? err.message : '返信の生成に失敗しました');
             } finally {
@@ -1002,6 +1016,40 @@ export default function Home() {
               )}
             </div>
             
+            {/* ゴール選択セクション */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6 fade-in-up" style={{ animationDelay: '0.15s' }}>
+              <div className="flex items-center space-x-3 mb-4">
+                <Target className="w-6 h-6 text-purple-500" />
+                <label className="text-lg font-bold text-gray-800 tracking-tight">
+                  🎯 ゴールを選択（オプション）
+                </label>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                ゴールを選ぶと、AIが戦略を立てて「次の一手」まで提案します
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {GOALS.map((goal) => (
+                  <button
+                    key={goal.id}
+                    onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id)}
+                    className={`p-3 rounded-xl border transition-all text-left ${
+                      selectedGoal === goal.id
+                        ? 'bg-purple-100 border-purple-400 text-purple-700 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-purple-200 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span className="text-xl mr-2">{goal.icon}</span>
+                    <span className="font-medium text-sm">{goal.label}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedGoal && (
+                <p className="mt-4 text-sm text-purple-600 font-medium">
+                  ✅ 選択中: {GOALS.find(g => g.id === selectedGoal)?.label}
+                </p>
+              )}
+            </div>
+            
             <div>
               <div className="flex items-center justify-between mb-4">
                 <label className="block text-lg font-semibold text-gray-800 tracking-tight">
@@ -1183,14 +1231,77 @@ export default function Home() {
               </button>
             </div>
 
+            {/* ゴール駆動型の戦略表示 */}
+            {goalDrivenInfo && (
+              <div className="mt-10 space-y-6 fade-in-up" style={{ animationDelay: '0.25s' }}>
+                <h3 className="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
+                  <Target className="w-6 h-6 mr-2 text-purple-500" />
+                  🎯 {GOALS.find(g => g.id === selectedGoal)?.label} 戦略
+                </h3>
+                
+                {/* 状態分析 */}
+                <div className="p-6 bg-blue-50 rounded-xl border border-blue-200">
+                  <h4 className="font-bold text-blue-800 mb-3 flex items-center">
+                    📊 現在の状態分析
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">温度感</p>
+                      <p className="text-2xl font-bold text-blue-600">{goalDrivenInfo.analysis.temperature}/10</p>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">ゴールまでの距離</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        {goalDrivenInfo.analysis.distanceToGoal === 'close' ? '🔥 近い' :
+                         goalDrivenInfo.analysis.distanceToGoal === 'medium' ? '📍 中程度' : '🏃 遠い'}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">タイミング</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        {goalDrivenInfo.analysis.timing === 'now' ? '⚡ 今すぐ' :
+                         goalDrivenInfo.analysis.timing === 'soon' ? '⏰ もう少し' : '⏳ まだ早い'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-blue-700 whitespace-pre-wrap">{goalDrivenInfo.analysis.summary}</p>
+                </div>
+                
+                {/* 戦略 */}
+                <div className="p-6 bg-purple-50 rounded-xl border border-purple-200">
+                  <h4 className="font-bold text-purple-800 mb-3">🎯 戦略</h4>
+                  <p className="text-purple-700 whitespace-pre-wrap">{goalDrivenInfo.strategy}</p>
+                </div>
+                
+                {/* 次の展開 */}
+                <div className="p-6 bg-green-50 rounded-xl border border-green-200">
+                  <h4 className="font-bold text-green-800 mb-3">📌 次の展開</h4>
+                  <div className="space-y-3">
+                    {goalDrivenInfo.nextSteps.map((step, idx) => (
+                      <div key={idx} className="flex items-start p-3 bg-white rounded-lg">
+                        <span className="text-green-600 mr-2 mt-1">•</span>
+                        <div>
+                          <span className="text-gray-600 text-sm">{step.condition}</span>
+                          <p className="text-gray-800 font-medium mt-1">→ {step.response}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {aiResponse && (
               <>
                 <div className="mt-10 fade-in-up" style={{ animationDelay: '0.3s' }}>
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-bold text-gray-800 tracking-tight">返信候補（3案）</h3>
+                    <h3 className="text-2xl font-bold text-gray-800 tracking-tight">
+                      {goalDrivenInfo ? '📝 今送るべきメッセージ' : '返信候補（3案）'}
+                    </h3>
                     <button
                       onClick={async () => {
                         setIsLoading(true);
+                        setGoalDrivenInfo(null);
                         try {
                           const profileContext = Object.values(profileInfo).some(v => v.trim()) 
                             ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
@@ -1201,11 +1312,16 @@ export default function Home() {
                             undefined,
                             undefined,
                             fullConversationText || undefined,
-                            profileContext
+                            profileContext,
+                            selectedGoal || undefined // ゴールを渡す
                           );
                           setAiResponse(result.response);
                           setAiExplanation(result.explanation);
                           setAlternativeResponses(result.alternatives || []);
+                          // ゴール駆動型の情報を設定
+                          if (result.goalDriven) {
+                            setGoalDrivenInfo(result.goalDriven);
+                          }
                         } catch (err) {
                           setError(err instanceof Error ? err.message : '返信の再生成に失敗しました');
                         } finally {

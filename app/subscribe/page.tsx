@@ -19,7 +19,7 @@ export default function SubscribePage() {
       setToken(storedToken);
       loadUser(storedToken);
     } else {
-      router.push('/auth/login-utage');
+      router.push('/login');
     }
   }, [router]);
 
@@ -30,7 +30,7 @@ export default function SubscribePage() {
     } catch (err) {
       console.error('Failed to load user:', err);
       localStorage.removeItem('token');
-      router.push('/auth/login-utage');
+      router.push('/login');
     }
   };
 
@@ -42,15 +42,31 @@ export default function SubscribePage() {
     setSuccess('');
 
     try {
-      await subscribe(token, plan);
-      setSuccess('サブスクリプションが有効になりました！');
-      await loadUser(token);
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
+      // Stripe Checkout Sessionを作成
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Checkout Sessionの作成に失敗しました');
+      }
+
+      const data = await response.json();
+      
+      // Stripe Checkoutページにリダイレクト
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Checkout URLが取得できませんでした');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'サブスクリプションの処理に失敗しました');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -120,11 +136,34 @@ export default function SubscribePage() {
       <main className="max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-20">
         {user.isSubscribed && (
           <div className="mb-8 p-8 bg-gradient-to-r from-green-900/40 to-emerald-900/40 border border-green-800/50 rounded-2xl text-green-300 fade-in-up">
-            <div className="flex items-center">
-              <Crown className="w-6 h-6 mr-3 text-green-400" />
-              <p className="text-lg font-semibold">
-                あなたは既に会員です。有効期限: {user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).toLocaleDateString('ja-JP') : '無期限'}
-              </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Crown className="w-6 h-6 mr-3 text-green-400" />
+                <p className="text-lg font-semibold">
+                  あなたは既に会員です。有効期限: {user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).toLocaleDateString('ja-JP') : '無期限'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/stripe/portal', {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (data.url) {
+                      window.location.href = data.url;
+                    }
+                  } catch (err) {
+                    console.error('Failed to open portal:', err);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                プラン管理
+              </button>
             </div>
           </div>
         )}
@@ -303,8 +342,8 @@ export default function SubscribePage() {
         </div>
 
         <div className="mt-20 text-center text-gray-500 text-base">
-          <p>※ 本サービスはデモ版です。実際の決済処理は実装されていません。</p>
-          <p>本番環境では、Stripe等の決済サービスと統合してください。</p>
+          <p>※ 決済はStripeを通じて安全に処理されます。</p>
+          <p>解約・プラン変更は「プラン管理」ボタンからいつでも可能です。</p>
         </div>
       </main>
       </div>

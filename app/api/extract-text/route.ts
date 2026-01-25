@@ -182,13 +182,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出（埋め込みモードではスキップ）
-      if (!isEmbedToken && detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now())) {
-        console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname });
-        return NextResponse.json(
-          { error: '異常なアクセスパターンが検出されました', extractedText: '', message: '' },
-          { status: 403 }
-        );
+      // 異常なアクセスパターンを検出（埋め込みモード・開発環境ではスキップ）
+      if (!isDevMode && !isEmbedToken) {
+        const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
+        if (anomalyResult.isAnomalous) {
+          console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
+          return NextResponse.json(
+            { error: '異常なアクセスパターンが検出されました', extractedText: '', message: '' },
+            { status: 403 }
+          );
+        }
       }
     }
 
@@ -197,28 +200,31 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody);
 
     // リクエストの署名を検証（オプション、Utage側で署名を送信する場合）
-    const signature = request.headers.get('x-utage-signature');
-    const timestamp = request.headers.get('x-utage-timestamp');
-    const contentHash = request.headers.get('x-content-hash');
+    // 開発環境ではスキップ
+    if (!isDevMode) {
+      const signature = request.headers.get('x-utage-signature');
+      const timestamp = request.headers.get('x-utage-timestamp');
+      const contentHash = request.headers.get('x-content-hash');
 
-    if (signature && timestamp) {
-      if (!verifyRequestSignature(rawBody, signature, timestamp)) {
-        console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
-        return NextResponse.json(
-          { error: 'リクエストの署名が無効です', extractedText: '', message: '' },
-          { status: 403 }
-        );
+      if (signature && timestamp) {
+        if (!verifyRequestSignature(rawBody, signature, timestamp)) {
+          console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
+          return NextResponse.json(
+            { error: 'リクエストの署名が無効です', extractedText: '', message: '' },
+            { status: 403 }
+          );
+        }
       }
-    }
 
-    // リクエストの整合性をチェック（オプション）
-    if (contentHash) {
-      if (!verifyRequestIntegrity(rawBody, contentHash)) {
-        console.warn('リクエストの整合性チェックに失敗:', { contentHash });
-        return NextResponse.json(
-          { error: 'リクエストの整合性が確認できませんでした', extractedText: '', message: '' },
-          { status: 403 }
-        );
+      // リクエストの整合性をチェック（オプション）
+      if (contentHash) {
+        if (!verifyRequestIntegrity(rawBody, contentHash)) {
+          console.warn('リクエストの整合性チェックに失敗:', { contentHash });
+          return NextResponse.json(
+            { error: 'リクエストの整合性が確認できませんでした', extractedText: '', message: '' },
+            { status: 403 }
+          );
+        }
       }
     }
     // Validate request body
