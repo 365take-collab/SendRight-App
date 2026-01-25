@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.sendright.jp';
     
     // Checkout Session作成
-    const session = await stripe.checkout.sessions.create({
+    const sessionOptions: any = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
       success_url: `${baseUrl}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/subscribe?canceled=true`,
       subscription_data: {
-        trial_period_days: 7,
         metadata: {
           plan: plan,
           ...(userId && { userId }),
@@ -74,8 +73,17 @@ export async function POST(request: NextRequest) {
         plan: plan,
         ...(userId && { userId }),
       },
-      ...(customerId ? { customer: customerId } : {}),
-    });
+    };
+
+    // 試用期間を設定（7日間）
+    sessionOptions.subscription_data.trial_period_days = 7;
+
+    // 既存顧客がいる場合は紐付け
+    if (customerId) {
+      sessionOptions.customer = customerId;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionOptions);
 
     return NextResponse.json({
       sessionId: session.id,
@@ -92,12 +100,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Stripeエラーの詳細をログ出力
+    let errorMessage = 'Checkout Sessionの作成に失敗しました';
     if (error instanceof Error) {
       console.error('Error details:', error.message);
+      errorMessage = error.message;
+      
+      // Stripe APIエラーの場合、詳細情報を取得
+      if ('type' in error && 'code' in error) {
+        const stripeError = error as any;
+        errorMessage = `Stripe Error: ${stripeError.type} - ${stripeError.message || stripeError.code}`;
+        console.error('Stripe error details:', JSON.stringify(stripeError, null, 2));
+      }
     }
 
     return NextResponse.json(
-      { error: 'Checkout Sessionの作成に失敗しました' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
