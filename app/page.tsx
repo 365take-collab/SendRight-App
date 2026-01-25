@@ -710,7 +710,7 @@ export default function Home() {
                 1日50回まで使い放題！
               </p>
               <a
-                href="https://utage-system.com/p/pv2aPWlkKS4z"
+                href="/subscribe"
                 className="inline-block w-full py-4 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold text-lg rounded-xl hover:opacity-90 transition-all text-center shadow-lg shadow-pink-200"
               >
                 7日間無料で試す →
@@ -726,7 +726,7 @@ export default function Home() {
             
             {/* 既存会員向けリンク */}
             <a
-              href="https://utage-system.com/members/prUSVju86L5m/home"
+              href="/login"
               className="inline-block w-full py-3 bg-white border-2 border-pink-300 text-pink-500 font-bold rounded-xl hover:bg-pink-50 transition-all text-center"
             >
               会員サイトからログイン
