@@ -279,7 +279,7 @@ export default function Home() {
       if (err instanceof Error && err.message.includes('ユーザーが見つかりません')) {
         alert('セッションが切れました。再度ログインしてください。\n\n※ 開発環境では、サーバー再起動時にデータがリセットされます。');
       }
-      router.push('/auth/login-utage');
+      router.push('/login');
     }
   };
 

@@ -111,7 +111,7 @@ export default function ProfileDiagnosisPage() {
     if (isDevMode || isUtageAccess) {
       setIsAuthenticated(true);
     } else {
-      router.push('/auth/login-utage');
+      router.push('/login');
     }
     
     // ローカルストレージから診断結果を読み込み

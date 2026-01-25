@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByEmail, verifyPassword } from '@/lib/auth';
-import { generateToken } from '@/lib/auth';
+import { findUserByEmail, verifyPassword, generateToken } from '@/lib/auth';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -9,26 +8,53 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  // 通常のログイン機能は無効化（Utageからのアクセスのみ許可）
-  return NextResponse.json(
-    { error: 'このログイン方法は利用できません。Utageの会員サイトからアクセスしてください。' },
-    { status: 403 }
-  );
+  try {
+    const body = await request.json();
+    const { email, password } = loginSchema.parse(body);
+
+    // ユーザーを検索
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'メールアドレスまたはパスワードが正しくありません' },
+        { status: 401 }
+      );
+    }
+
+    // パスワードを検証
+    const isValid = await verifyPassword(password, user.passwordHash || '');
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'メールアドレスまたはパスワードが正しくありません' },
+        { status: 401 }
+      );
+    }
+
+    // トークンを生成
+    const token = generateToken(user.id);
+
+    return NextResponse.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        isSubscribed: user.isSubscribed,
+        subscriptionType: user.subscriptionType,
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.errors[0].message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'ログインに失敗しました' },
+      { status: 500 }
+    );
+  }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
