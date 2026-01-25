@@ -298,15 +298,17 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // トップページ（/）は誰でもアクセス可能（メール登録フォームを表示）
-  // 認証状態はアプリ側（page.tsx）で判定し、適切なUIを表示する
-  if (request.nextUrl.pathname === '/') {
-    console.log('トップページへのアクセスを許可（認証チェックはアプリ側で実施）');
+  // 公開ページは誰でもアクセス可能
+  const publicPaths = ['/', '/login', '/subscribe', '/purchase-complete'];
+  const isPublicPath = publicPaths.some(path => request.nextUrl.pathname === path);
+  
+  if (isPublicPath) {
+    console.log('公開ページへのアクセスを許可:', request.nextUrl.pathname);
     return response;
   }
   
-  // それ以外の保護されたページ（/help, /subscribeなど）
-  const protectedPaths = ['/help', '/subscribe'];
+  // それ以外の保護されたページ（/helpなど）
+  const protectedPaths = ['/help'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
   // 保護されたページへのアクセスにはトークンまたはUtageアクセスフラグが必要
