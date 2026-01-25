@@ -1,13 +1,16 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resendインスタンス（環境変数がない場合はnull）
+const resend = process.env.RESEND_API_KEY 
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'SendRight <noreply@sendright.jp>';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
 
 // ウェルカムメール送信
 export async function sendWelcomeEmail(email: string, plan: 'monthly' | 'yearly') {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend || !process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set, skipping email send');
     return;
   }
@@ -71,7 +74,7 @@ export async function sendStepEmail(
   email: string,
   emailType: 'welcome' | 'day1' | 'day3' | 'day7' | 'day14' | 'day30'
 ) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend || !process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set, skipping email send');
     return;
   }
@@ -201,7 +204,7 @@ export async function sendStepEmail(
 
 // 解約メール送信
 export async function sendCancellationEmail(email: string) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend || !process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set, skipping email send');
     return;
   }
