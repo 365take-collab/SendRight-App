@@ -5,9 +5,7 @@ import { verifyToken, findUserById, checkSubscription } from '@/lib/auth';
 /**
  * アクセス拒否時のHTMLページを生成
  */
-function getAccessDeniedHTML(message: string, showUtageOption: boolean = true, memberPageUrl?: string): string {
-  // 会員ページURLを取得（環境変数から、またはデフォルト値）
-  const utageMemberUrl = memberPageUrl || process.env.UTAGE_MEMBER_URL || 'https://utage-system.com/members/prUSVju86L5m/home';
+function getAccessDeniedHTML(message: string, showLoginOption: boolean = true): string {
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -142,24 +140,16 @@ function getAccessDeniedHTML(message: string, showUtageOption: boolean = true, m
     <div class="icon">🔒</div>
     <h1>アクセスできません</h1>
     <p class="message">${message}</p>
-    ${showUtageOption ? `
+    ${showLoginOption ? `
     <div class="highlight">
       <strong>💡 解決方法</strong><br>
-      ログイン済みで課金期間中でもアクセスできない場合は、会員ページから入り直してください。
-    </div>
-    <div class="instruction">
-      <div class="instruction-title">会員ページから入り直す方法</div>
-      <ol class="instruction-steps">
-        <li>会員ページにアクセスしてください</li>
-        <li>会員ページから「SendRightにログイン」をクリックしてください</li>
-        <li>ログイン後、このページに再度アクセスしてください</li>
-      </ol>
+      ログインしてからアクセスしてください。
     </div>
     ` : ''}
     <div class="button-group">
-      ${showUtageOption ? `<a href="${utageMemberUrl}" target="_blank" class="button">会員ページにアクセス</a>` : ''}
-      ${showUtageOption ? '<a href="#" onclick="window.history.back(); return false;" class="button button-secondary">前のページに戻る</a>' : ''}
-      <a href="/" class="button">トップページに戻る</a>
+      ${showLoginOption ? '<a href="/login" class="button">ログインする</a>' : ''}
+      ${showLoginOption ? '<a href="/subscribe" class="button button-secondary">会員登録する</a>' : ''}
+      <a href="/" class="button button-secondary">トップページに戻る</a>
     </div>
     <div class="footer">
       お手数をおかけして申し訳ございません
@@ -201,7 +191,7 @@ export async function middleware(request: NextRequest) {
       
       // 異常検出の場合は403を返す（開発環境では警告のみ）
       if (process.env.NODE_ENV === 'production') {
-        return new NextResponse(getAccessDeniedHTML('異常なアクセスパターンが検出されました。会員ページから再度ログインしてください。', true), {
+        return new NextResponse(getAccessDeniedHTML('異常なアクセスパターンが検出されました。再度ログインしてください。', true), {
           status: 403,
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
         });
@@ -332,7 +322,7 @@ export async function middleware(request: NextRequest) {
         hasUtageAccess,
       });
       
-      return new NextResponse(getAccessDeniedHTML('このアプリへのアクセスにはログインが必要です。メールのリンクからログインしてください。', true), {
+      return new NextResponse(getAccessDeniedHTML('このページへのアクセスにはログインが必要です。', true), {
         status: 403,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
