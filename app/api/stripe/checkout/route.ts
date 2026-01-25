@@ -8,8 +8,17 @@ const checkoutSchema = z.object({
 });
 
 // Stripe Price IDs（環境変数から取得）
-const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || 'price_1ShWEK3F2rtCunnnqVQRiLAd';
-const STRIPE_PRICE_YEARLY = process.env.STRIPE_PRICE_YEARLY || 'price_1ShWEk3F2rtCunnnkSn8wg2I';
+// テスト環境用のPrice IDも設定可能（STRIPE_PRICE_MONTHLY_TEST, STRIPE_PRICE_YEARLY_TEST）
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const isTestMode = STRIPE_SECRET_KEY.startsWith('sk_test_');
+
+const STRIPE_PRICE_MONTHLY = isTestMode 
+  ? (process.env.STRIPE_PRICE_MONTHLY_TEST || process.env.STRIPE_PRICE_MONTHLY || 'price_1ShWEK3F2rtCunnnqVQRiLAd')
+  : (process.env.STRIPE_PRICE_MONTHLY || 'price_1ShWEK3F2rtCunnnqVQRiLAd');
+
+const STRIPE_PRICE_YEARLY = isTestMode
+  ? (process.env.STRIPE_PRICE_YEARLY_TEST || process.env.STRIPE_PRICE_YEARLY || 'price_1ShWEk3F2rtCunnnkSn8wg2I')
+  : (process.env.STRIPE_PRICE_YEARLY || 'price_1ShWEk3F2rtCunnnkSn8wg2I');
 
 export async function POST(request: NextRequest) {
   try {

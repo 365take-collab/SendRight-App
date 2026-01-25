@@ -8,7 +8,7 @@ if (!stripeSecretKey) {
 }
 
 export const stripe = stripeSecretKey 
-  ? new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' })
+  ? new Stripe(stripeSecretKey)
   : null;
 
 // Stripeが設定されていない場合のヘルパー
