@@ -22,32 +22,6 @@ const STRIPE_PRICE_YEARLY = isTestMode
 
 export async function POST(request: NextRequest) {
   try {
-    // 認証チェック
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: '無効なトークンです' },
-        { status: 401 }
-      );
-    }
-
-    const user = await findUserById(decoded.userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 }
-      );
-    }
-
     const body = await request.json();
     const { plan } = checkoutSchema.parse(body);
 
@@ -57,25 +31,42 @@ export async function POST(request: NextRequest) {
     // Price IDを選択
     const priceId = plan === 'monthly' ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
 
-    // Stripe Customerを作成または取得
-    let customerId = user.stripeCustomerId;
-    
-    if (!customerId) {
-      // 新規Stripe Customer作成
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          userId: user.id,
-        },
-      });
-      customerId = customer.id;
+    // 認証チェック（オプション - トークンがあれば既存ユーザーとして処理）
+    const authHeader = request.headers.get('authorization');
+    let customerId: string | undefined;
+    let userId: string | undefined;
+
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const decoded = verifyToken(token);
+      
+      if (decoded) {
+        const user = await findUserById(decoded.userId);
+        if (user) {
+          userId = user.id;
+          
+          // 既存のStripe Customerがあれば使用
+          if (user.stripeCustomerId) {
+            customerId = user.stripeCustomerId;
+          } else {
+            // 新規Stripe Customer作成
+            const customer = await stripe.customers.create({
+              email: user.email,
+              metadata: {
+                userId: user.id,
+              },
+            });
+            customerId = customer.id;
+          }
+        }
+      }
     }
 
     // Checkout Sessionを作成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.sendright.jp';
     
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+    // セッション作成オプション
+    const sessionOptions: any = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -86,17 +77,29 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${baseUrl}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/subscribe?canceled=true`,
-      metadata: {
-        userId: user.id,
-        plan: plan,
-      },
+      // 7日間無料トライアル
       subscription_data: {
+        trial_period_days: 7,
         metadata: {
-          userId: user.id,
           plan: plan,
+          ...(userId && { userId }),
         },
       },
-    });
+      metadata: {
+        plan: plan,
+        ...(userId && { userId }),
+      },
+    };
+
+    // 既存顧客がいる場合は紐付け、いない場合はメールアドレスを収集
+    if (customerId) {
+      sessionOptions.customer = customerId;
+    } else {
+      // 新規顧客の場合、Checkoutでメールアドレスを収集
+      sessionOptions.customer_creation = 'always';
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionOptions);
 
     return NextResponse.json({
       sessionId: session.id,
