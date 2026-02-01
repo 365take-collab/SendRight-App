@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
   stripe_customer_id TEXT,
   is_subscribed BOOLEAN DEFAULT false,
   is_utage_user BOOLEAN DEFAULT false,

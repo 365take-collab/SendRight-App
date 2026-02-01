@@ -8,20 +8,31 @@ const resend = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'SendRight <noreply@sendright.jp>';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
 
-// ウェルカムメール送信
-export async function sendWelcomeEmail(email: string, plan: 'monthly' | 'yearly') {
+// ウェルカムメール送信（初期パスワード付き）
+export async function sendWelcomeEmail(email: string, plan: 'monthly' | 'yearly', initialPassword?: string) {
   if (!resend || !process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set, skipping email send');
     return;
   }
 
   const planName = plan === 'monthly' ? '月額プラン' : '年額プラン';
-  
+
+  const loginSection = initialPassword
+    ? `
+      <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h3 style="margin: 0 0 10px 0; color: #856404;">ログイン情報</h3>
+        <p style="margin: 5px 0;"><strong>メールアドレス:</strong> ${email}</p>
+        <p style="margin: 5px 0;"><strong>初期パスワード:</strong> <code style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-size: 16px; letter-spacing: 1px;">${initialPassword}</code></p>
+        <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">※ セキュリティのため、ログイン後にパスワードを変更することをお勧めします。</p>
+      </div>
+    `
+    : '';
+
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: 'SendRightへようこそ！',
+      subject: 'SendRightへようこそ！ ログイン情報のお知らせ',
       html: `
         <!DOCTYPE html>
         <html>
@@ -44,9 +55,10 @@ export async function sendWelcomeEmail(email: string, plan: 'monthly' | 'yearly'
             <div class="content">
               <p>こんにちは、</p>
               <p>SendRightへのご登録ありがとうございます！</p>
-              <p>あなたの${planName}が有効になりました。今すぐAI返信生成を始めましょう。</p>
+              <p>あなたの${planName}が有効になりました。</p>
+              ${loginSection}
               <div style="text-align: center;">
-                <a href="${BASE_URL}" class="button">SendRightを始める</a>
+                <a href="${BASE_URL}/login" class="button">SendRightにログインする</a>
               </div>
               <p>何かご質問がございましたら、お気軽にお問い合わせください。</p>
               <p>それでは、素敵な会話を！</p>

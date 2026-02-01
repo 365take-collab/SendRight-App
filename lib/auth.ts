@@ -71,6 +71,16 @@ export const BADGES = {
 // ヘルパー関数
 // ========================================
 
+// ランダムな初期パスワードを生成（英数字8文字）
+export function generateInitialPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 8; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
 export function calculateLevel(totalUsageCount: number): number {
   if (totalUsageCount >= 1000) return 10;
   if (totalUsageCount >= 500) return 9;
@@ -104,6 +114,7 @@ function dbUserToUser(dbUser: db.DbUser): User {
   return {
     id: dbUser.id,
     email: dbUser.email,
+    passwordHash: dbUser.password_hash || undefined,
     isSubscribed: dbUser.is_subscribed,
     stripeCustomerId: dbUser.stripe_customer_id || undefined,
     isUtageUser: dbUser.is_utage_user,
@@ -150,9 +161,10 @@ export function verifyToken(token: string): { userId: string } | null {
 
 export async function createUser(email: string, password?: string): Promise<User> {
   const passwordHash = password ? await hashPassword(password) : undefined;
-  
+
   const dbUser = await db.createUser({
     email,
+    password_hash: passwordHash || null,
     is_subscribed: false,
     is_utage_user: false,
     daily_usage_limit: DEFAULT_DAILY_USAGE_LIMIT,

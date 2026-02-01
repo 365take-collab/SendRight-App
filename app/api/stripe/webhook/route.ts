@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStripe } from '@/lib/stripe';
-import { findUserByEmail, createUser } from '@/lib/auth';
+import { findUserByEmail, createUser, generateInitialPassword } from '@/lib/auth';
 import { updateUser } from '@/lib/supabase';
 import { grantReferralReward } from '@/lib/supabase';
 import { getSupabaseClient } from '@/lib/supabase';
+import { sendWelcomeEmail } from '@/lib/resend';
 import Stripe from 'stripe';
 
 // UTAGE フォームURL
@@ -127,10 +128,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // ユーザーを検索または作成
   let user = await findUserByEmail(customerEmail);
-  
+  let initialPassword: string | undefined;
+
   if (!user) {
-    // 新規ユーザー作成
-    user = await createUser(customerEmail);
+    // 新規ユーザー作成（初期パスワード付き）
+    initialPassword = generateInitialPassword();
+    user = await createUser(customerEmail, initialPassword);
   }
 
   // Stripe Customer IDを保存
@@ -141,7 +144,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     daily_usage_limit: 50, // デフォルトの使用回数制限
   });
 
-  // UTAGEに登録（ウェルカムメール・ステップメール配信用）
+  // ウェルカムメール送信（ログイン情報付き）
+  try {
+    await sendWelcomeEmail(customerEmail, plan || 'monthly', initialPassword);
+    console.log('Welcome email sent:', customerEmail);
+  } catch (error) {
+    console.error('Failed to send welcome email:', error);
+  }
+
+  // UTAGEに登録（ステップメール配信用）
   try {
     await registerToUtage(customerEmail, customerName, plan || 'monthly');
     console.log('UTAGE registration successful:', customerEmail);
@@ -160,6 +171,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     email: customerEmail,
     plan,
     userId: user.id,
+    isNewUser: !!initialPassword,
   });
 }
 

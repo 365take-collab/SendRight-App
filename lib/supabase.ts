@@ -30,6 +30,7 @@ export function getSupabaseClient(): SupabaseClient {
 export interface DbUser {
   id: string;
   email: string;
+  password_hash: string | null;
   stripe_customer_id: string | null;
   is_subscribed: boolean;
   is_utage_user: boolean;
