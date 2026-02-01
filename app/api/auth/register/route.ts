@@ -9,9 +9,9 @@ const registerSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  // 通常の登録機能は無効化（Utageからのアクセスのみ許可）
+  // 通常の登録機能は無効化（Stripe Checkout経由で登録）
   return NextResponse.json(
-    { error: 'この登録方法は利用できません。Utageの会員サイトからアクセスしてください。' },
+    { error: 'この登録方法は利用できません。購入ページからお申し込みください。' },
     { status: 403 }
   );
 }

@@ -173,130 +173,28 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const timestamp = Date.now();
   
-  // 異常検出を実行（ログイン関連のパスは除外）
-  if (!pathname.includes('/login-utage') && !pathname.includes('/auth/login-utage')) {
-    const anomalyCheck = detectAnomalousPattern(userId, pathname, timestamp, clientIP);
-    if (anomalyCheck.isAnomalous) {
-      console.error('異常なアクセスパターンを検出:', {
-        userId,
-        pathname,
-        ip: clientIP,
-        reason: anomalyCheck.reason,
-        timestamp: new Date(timestamp).toISOString(),
+  // 異常検出を実行
+  const anomalyCheck = detectAnomalousPattern(userId, pathname, timestamp, clientIP);
+  if (anomalyCheck.isAnomalous) {
+    console.error('異常なアクセスパターンを検出:', {
+      userId,
+      pathname,
+      ip: clientIP,
+      reason: anomalyCheck.reason,
+      timestamp: new Date(timestamp).toISOString(),
+    });
+
+    // 異常検出の場合は403を返す（開発環境では警告のみ）
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse(getAccessDeniedHTML('異常なアクセスパターンが検出されました。再度ログインしてください。', true), {
+        status: 403,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
-      
-      // 異常なアクセスの場合は、セッションを無効化
-      response.cookies.delete('utage_access');
-      response.cookies.delete('utage_access_timestamp');
-      
-      // 異常検出の場合は403を返す（開発環境では警告のみ）
-      if (process.env.NODE_ENV === 'production') {
-        return new NextResponse(getAccessDeniedHTML('異常なアクセスパターンが検出されました。再度ログインしてください。', true), {
-          status: 403,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        });
-      }
     }
   }
 
   // ngrokの警告ページをスキップするためのヘッダーを設定
   response.headers.set('ngrok-skip-browser-warning', 'true');
-
-  // Utageからのアクセスかチェック（すべてのページで）
-  const referer = request.headers.get('referer') || request.headers.get('referrer');
-  const origin = request.headers.get('origin');
-  const allowedUtageDomains = [
-    'utage-system.com',
-    'utage.jp',
-    'utage.co.jp',
-  ];
-
-  const isFromUtage = (referer && allowedUtageDomains.some(domain => referer.includes(domain))) ||
-                      (origin && allowedUtageDomains.some(domain => origin.includes(domain)));
-
-  // セッション情報をチェック（クッキーから）
-  const utageSession = request.cookies.get('utage_access')?.value === 'true';
-  const existingSession = request.cookies.get('utage_access_timestamp');
-  const sessionTimestamp = existingSession ? parseInt(existingSession.value, 10) : null;
-  const now = Date.now();
-  const sessionMaxAge = 24 * 60 * 60 * 1000; // 1日
-  
-  // セッションが有効かチェック（セッションクッキーがあり、タイムスタンプが有効期限内）
-  const isValidSession = utageSession && sessionTimestamp && (now - sessionTimestamp < sessionMaxAge);
-
-  // Utageからのアクセスか、有効なセッション情報がある場合
-  // セッションがあれば、referer/originチェックをスキップしてURLから直接アクセス可能
-  const hasUtageAccess = isFromUtage || isValidSession;
-
-  // Utageからのアクセスまたは有効なセッションがある場合、セッション情報を更新
-  if (hasUtageAccess) {
-    response.headers.set('x-utage-access', 'true');
-    
-    if (isValidSession) {
-      // 有効なセッションがある場合は、セッションを延長
-      response.cookies.set('utage_access', 'true', {
-        maxAge: 24 * 60 * 60, // 1日
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      
-      // セッションタイムスタンプを更新（アクティビティがある場合は延長）
-      response.cookies.set('utage_access_timestamp', now.toString(), {
-        maxAge: 24 * 60 * 60, // 1日
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      
-      console.log('有効なセッションでアクセス:', { 
-        pathname: request.nextUrl.pathname,
-        sessionAge: Math.floor((now - sessionTimestamp!) / 1000 / 60) + '分',
-        accessType: 'direct_url' // URLから直接アクセス
-      });
-    } else if (isFromUtage) {
-      // Utageからの新規アクセスの場合、セッションを設定
-      response.cookies.set('utage_access', 'true', {
-        maxAge: 24 * 60 * 60, // 1日
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      
-      response.cookies.set('utage_access_timestamp', now.toString(), {
-        maxAge: 24 * 60 * 60, // 1日
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      
-      console.log('Utageからの新規アクセス: セッションを設定', { 
-        referer, 
-        origin, 
-        pathname: request.nextUrl.pathname,
-        accessType: 'from_utage'
-      });
-    }
-  } else if (utageSession && sessionTimestamp) {
-    // セッションが期限切れの場合は削除
-    response.cookies.delete('utage_access');
-    response.cookies.delete('utage_access_timestamp');
-    response.cookies.delete('userId');
-    console.log('セッション期限切れ: クッキーを削除', { 
-      pathname: request.nextUrl.pathname,
-      sessionAge: Math.floor((now - sessionTimestamp) / 1000 / 60) + '分'
-    });
-  }
-
-  // /login-utage と /auth/login-utage へのアクセスは常に許可（ログインページは誰でもアクセス可能）
-  if (request.nextUrl.pathname === '/login-utage' || request.nextUrl.pathname === '/auth/login-utage') {
-    console.log('ログインページへのアクセスを許可:', { 
-      pathname: request.nextUrl.pathname,
-      referer,
-      origin
-    });
-    return response;
-  }
 
   // 公開ページは誰でもアクセス可能
   const publicPaths = ['/', '/login', '/subscribe', '/purchase-complete'];
@@ -311,29 +209,26 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/help'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
-  // 保護されたページへのアクセスにはトークンまたはUtageアクセスフラグが必要
+  // 保護されたページへのアクセスにはトークン（JWT）が必要
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
-    const hasUtageAccess = request.cookies.get('utage_access')?.value === 'true';
-    
-    // トークンもUtageアクセスもない場合はアクセス拒否
-    if (!authToken && !hasUtageAccess) {
+
+    // トークンがない場合はアクセス拒否
+    if (!authToken) {
       console.warn('認証なしでの保護ページへのアクセスを拒否:', {
         pathname: request.nextUrl.pathname,
         hasToken: !!authToken,
-        hasUtageAccess,
       });
-      
+
       return new NextResponse(getAccessDeniedHTML('このページへのアクセスにはログインが必要です。', true), {
         status: 403,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
     }
-    
+
     console.log('認証OK: アクセス許可', {
       pathname: request.nextUrl.pathname,
       hasToken: !!authToken,
-      hasUtageAccess,
     });
   }
 

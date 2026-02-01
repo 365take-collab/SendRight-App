@@ -79,8 +79,7 @@ function CancelPageContent() {
         description: '次の3ヶ月間、50%オフでご利用いただけます（月額6,980円 → 3,490円）',
         cta: '50%オフで継続する',
         action: () => {
-          // Utageの割引決済ページにリダイレクト
-          window.location.href = process.env.NEXT_PUBLIC_UTAGE_DISCOUNT_URL || '/subscribe?discount=50';
+          window.location.href = '/subscribe?discount=50';
         },
       },
     },
@@ -150,8 +149,8 @@ function CancelPageContent() {
   const handleCancel = async () => {
     setIsLoading(true);
     try {
-      // Utageの解約ページにリダイレクト
-      window.location.href = process.env.NEXT_PUBLIC_UTAGE_CANCEL_URL || '/';
+      // 解約処理（トップページにリダイレクト）
+      window.location.href = '/';
     } catch (error) {
       console.error('Cancel error:', error);
       alert('解約処理中にエラーが発生しました。サポートにお問い合わせください。');
@@ -363,7 +362,7 @@ function CancelPageContent() {
               </div>
               <button
                 onClick={() => {
-                  window.location.href = process.env.NEXT_PUBLIC_UTAGE_BASIC_URL || '/subscribe?plan=basic';
+                  window.location.href = '/subscribe?plan=basic';
                 }}
                 className="w-full py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-500 transition-all"
               >

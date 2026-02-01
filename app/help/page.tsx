@@ -52,8 +52,8 @@ export default function HelpPage() {
                       1
                     </span>
                     <div>
-                      <p className="font-medium text-gray-800 mb-1">Utageの会員ページにアクセス</p>
-                      <p className="text-sm text-gray-500">Utageの会員ページからSendRightにアクセスしてください。</p>
+                      <p className="font-medium text-gray-800 mb-1">購入完了メールを確認</p>
+                      <p className="text-sm text-gray-500">購入時に届くメールに記載されたメールアドレスとパスワードを確認してください。</p>
                     </div>
                   </li>
                   <li className="flex items-start">
@@ -62,7 +62,7 @@ export default function HelpPage() {
                     </span>
                     <div>
                       <p className="font-medium text-gray-800 mb-1">SendRightにログイン</p>
-                      <p className="text-sm text-gray-500">会員ページからSendRightのリンクをクリックすると、自動的にログインされます。</p>
+                      <p className="text-sm text-gray-500">ログインページからメールアドレスとパスワードを入力してログインしてください。</p>
                     </div>
                   </li>
                   <li className="flex items-start">
@@ -70,16 +70,11 @@ export default function HelpPage() {
                       3
                     </span>
                     <div>
-                      <p className="font-medium text-gray-800 mb-1">URLから直接アクセス可能</p>
-                      <p className="text-sm text-gray-500">ログイン後は、SendRightのURLに直接アクセスして使用できます。セッションは1日間有効です。</p>
+                      <p className="font-medium text-gray-800 mb-1">すぐに使い始められます</p>
+                      <p className="text-sm text-gray-500">ログイン後は、SendRightの全機能をご利用いただけます。</p>
                     </div>
                   </li>
                 </ol>
-                <div className="mt-6 p-4 bg-pink-50 border border-pink-200 rounded-lg">
-                  <p className="text-sm text-pink-700">
-                    <strong>注意：</strong> セッションの有効期限が切れた場合は、Utageの会員ページから再度ログインしてください。
-                  </p>
-                </div>
               </div>
             )}
           </div>
@@ -273,7 +268,7 @@ export default function HelpPage() {
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">Q: セッションが切れた場合はどうすればいいですか？</h3>
                   <p className="text-gray-600 text-sm">
-                    A: Utageの会員ページから再度SendRightにアクセスしてください。セッションは1日間有効です。
+                    A: ログインページから再度ログインしてください。セッションは7日間有効です。
                   </p>
                 </div>
                 <div>

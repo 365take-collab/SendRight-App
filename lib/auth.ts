@@ -15,7 +15,6 @@ export interface User {
   isSubscribed: boolean;
   subscriptionExpiresAt?: Date;
   stripeCustomerId?: string;
-  isUtageUser: boolean;
   dailyUsageLimit: number;
   subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly';
   currentStreak: number;
@@ -117,7 +116,6 @@ function dbUserToUser(dbUser: db.DbUser): User {
     passwordHash: dbUser.password_hash || undefined,
     isSubscribed: dbUser.is_subscribed,
     stripeCustomerId: dbUser.stripe_customer_id || undefined,
-    isUtageUser: dbUser.is_utage_user,
     dailyUsageLimit: dbUser.daily_usage_limit,
     subscriptionType: dbUser.subscription_type as User['subscriptionType'],
     currentStreak: dbUser.current_streak,
@@ -166,7 +164,6 @@ export async function createUser(email: string, password?: string): Promise<User
     email,
     password_hash: passwordHash || null,
     is_subscribed: false,
-    is_utage_user: false,
     daily_usage_limit: DEFAULT_DAILY_USAGE_LIMIT,
     subscription_type: 'free',
     current_streak: 0,
@@ -182,53 +179,6 @@ export async function createUser(email: string, password?: string): Promise<User
   }
 
   return dbUserToUser(dbUser);
-}
-
-export async function createOrUpdateUserFromUtage(
-  email: string,
-  stripeCustomerId: string,
-  isSubscribed: boolean = true,
-  subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly'
-): Promise<User> {
-  const planType = subscriptionType || (isSubscribed ? 'pro' : 'free');
-  const usageLimit = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.pro;
-
-  // 既存ユーザーを検索
-  const existingUser = await db.findUserByEmail(email);
-
-  if (existingUser) {
-    // 既存ユーザーを更新
-    const updated = await db.updateUser(existingUser.id, {
-      stripe_customer_id: stripeCustomerId,
-      is_subscribed: isSubscribed,
-      is_utage_user: true,
-      subscription_type: planType,
-      daily_usage_limit: usageLimit,
-    });
-    return dbUserToUser(updated || existingUser);
-  } else {
-    // 新規ユーザーを作成
-    const newUser = await db.createUser({
-      email,
-      stripe_customer_id: stripeCustomerId,
-      is_subscribed: isSubscribed,
-      is_utage_user: true,
-      subscription_type: planType,
-      daily_usage_limit: usageLimit,
-      current_streak: 0,
-      longest_streak: 0,
-      badges: [],
-      total_usage_count: 0,
-      success_count: 0,
-      level: 1,
-    });
-
-    if (!newUser) {
-      throw new Error('Failed to create user');
-    }
-
-    return dbUserToUser(newUser);
-  }
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {

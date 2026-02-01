@@ -3,45 +3,8 @@ import { requireStripe } from '@/lib/stripe';
 import { findUserByEmail, createUser, generateInitialPassword } from '@/lib/auth';
 import { updateUser } from '@/lib/supabase';
 import { grantReferralReward } from '@/lib/supabase';
-import { getSupabaseClient } from '@/lib/supabase';
 import { sendWelcomeEmail } from '@/lib/resend';
 import Stripe from 'stripe';
-
-// UTAGE フォームURL
-const UTAGE_FORM_URLS = {
-  monthly: 'https://utage-system.com/r/QMRGq4WA1pZW/store',
-  yearly: 'https://utage-system.com/r/eqdgSFrcTKs9/store',
-};
-
-// UTAGEにユーザーを登録
-async function registerToUtage(email: string, name: string, plan: 'monthly' | 'yearly') {
-  const formUrl = UTAGE_FORM_URLS[plan];
-  
-  try {
-    const formData = new URLSearchParams();
-    formData.append('mail', email);
-    formData.append('name', name || email.split('@')[0]); // 名前がない場合はメールアドレスの@前を使用
-    
-    const response = await fetch(formUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    });
-    
-    console.log('UTAGE registration result:', {
-      email,
-      plan,
-      status: response.status,
-    });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('Failed to register to UTAGE:', error);
-    return false;
-  }
-}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -118,20 +81,46 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const customerId = session.customer as string;
   const customerEmail = session.customer_email || session.customer_details?.email;
-  const customerName = session.customer_details?.name || '';
   const plan = session.metadata?.plan as 'monthly' | 'yearly' | undefined;
+  const type = session.metadata?.type;
 
   if (!customerEmail) {
     console.error('No customer email in checkout session');
     return;
   }
 
-  // ユーザーを検索または作成
+  // 追加課金（addon）の場合
+  if (type === 'addon') {
+    const dailyLimit = parseInt(session.metadata?.daily_limit || '50', 10);
+    const userId = session.metadata?.user_id;
+
+    if (userId) {
+      await updateUser(userId, {
+        daily_usage_limit: dailyLimit,
+        stripe_customer_id: customerId,
+      });
+      console.log('Addon checkout completed:', { email: customerEmail, dailyLimit, userId });
+    } else {
+      // user_idがない場合はemailで検索
+      const user = await findUserByEmail(customerEmail);
+      if (user) {
+        await updateUser(user.id, {
+          daily_usage_limit: dailyLimit,
+          stripe_customer_id: customerId,
+        });
+        console.log('Addon checkout completed (by email):', { email: customerEmail, dailyLimit });
+      } else {
+        console.error('User not found for addon checkout:', customerEmail);
+      }
+    }
+    return;
+  }
+
+  // 通常の新規サブスクリプション
   let user = await findUserByEmail(customerEmail);
   let initialPassword: string | undefined;
 
   if (!user) {
-    // 新規ユーザー作成（初期パスワード付き）
     initialPassword = generateInitialPassword();
     user = await createUser(customerEmail, initialPassword);
   }
@@ -141,7 +130,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     stripe_customer_id: customerId,
     is_subscribed: true,
     subscription_type: plan || 'monthly',
-    daily_usage_limit: 50, // デフォルトの使用回数制限
+    daily_usage_limit: 50,
   });
 
   // ウェルカムメール送信（ログイン情報付き）
@@ -150,14 +139,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log('Welcome email sent:', customerEmail);
   } catch (error) {
     console.error('Failed to send welcome email:', error);
-  }
-
-  // UTAGEに登録（ステップメール配信用）
-  try {
-    await registerToUtage(customerEmail, customerName, plan || 'monthly');
-    console.log('UTAGE registration successful:', customerEmail);
-  } catch (error) {
-    console.error('Failed to register to UTAGE:', error);
   }
 
   // 紹介報酬を付与（紹介経由で登録したユーザーが有料転換した場合）

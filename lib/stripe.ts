@@ -23,12 +23,12 @@ export async function checkSubscriptionStatus(customerId: string): Promise<{
   isActive: boolean;
   subscription?: Stripe.Subscription;
 }> {
-  // Stripeが設定されていない場合はスキップ（Utageで決済する場合）
+  // Stripeが設定されていない場合はスキップ
   if (!stripe) {
     console.log('Stripe is not configured, skipping subscription check');
     return { isActive: false };
   }
-  
+
   try {
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
@@ -52,7 +52,7 @@ export async function checkSubscriptionStatus(customerId: string): Promise<{
 }
 
 export async function getCustomerByEmail(email: string): Promise<Stripe.Customer | null> {
-  // Stripeが設定されていない場合はスキップ（Utageで決済する場合）
+  // Stripeが設定されていない場合はスキップ
   if (!stripe) {
     console.log('Stripe is not configured, skipping customer lookup');
     return null;

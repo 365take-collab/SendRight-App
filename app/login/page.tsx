@@ -135,9 +135,7 @@ export default function LoginPage() {
           >
             会員登録する
           </Link>
-        </div>
-
-        {/* フッター */}
+        </div>        {/* フッター */}
         <p className="text-xs text-gray-500 mt-6 text-center">
           © 2024 SendRight. All rights reserved.
         </p>

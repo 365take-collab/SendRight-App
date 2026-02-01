@@ -47,9 +47,6 @@ GROQ_API_KEY=your_groq_api_key_here
 # OPENAI_API_KEY=your_openai_api_key_here  ← 画像抽出機能を使う場合のみ設定
 
 JWT_SECRET=your_jwt_secret_here_change_this_in_production
-
-# Utage会員ページURL（アクセス拒否時のリンクに使用）
-UTAGE_MEMBER_URL=https://utage-system.com/member
 ```
 
 **💡 完全無料で使う方法**: 

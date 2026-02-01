@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, findUserById, updateDailyUsageLimit, getUsageInfo } from '@/lib/auth';
+import { verifyToken, findUserById, getUsageInfo } from '@/lib/auth';
+import { requireStripe } from '@/lib/stripe';
+
+// 追加課金プランの定義
+const ADDON_PLANS: Record<number, { priceEnv: string; label: string }> = {
+  100: { priceEnv: 'STRIPE_PRICE_ADDON_100', label: '100回/日プラン' },
+  150: { priceEnv: 'STRIPE_PRICE_ADDON_150', label: '150回/日プラン' },
+  200: { priceEnv: 'STRIPE_PRICE_ADDON_200', label: '200回/日プラン' },
+  250: { priceEnv: 'STRIPE_PRICE_ADDON_250', label: '250回/日プラン' },
+};
 
 // 使用回数制限を取得
 export async function GET(request: NextRequest) {
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 使用回数制限を更新（追加課金で増やす）
+// 使用回数制限を更新（Stripe Checkout経由で追加課金）
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -75,54 +84,50 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { newLimit } = body;
 
-    if (!newLimit || typeof newLimit !== 'number' || newLimit < 50) {
+    if (!newLimit || typeof newLimit !== 'number' || newLimit < 100) {
       return NextResponse.json(
-        { error: '有効な制限値を指定してください（最低50回）' },
+        { error: '有効な制限値を指定してください（100, 150, 200, 250）' },
         { status: 400 }
       );
     }
 
-    // Utage連携: 追加課金はUtageの決済ページにリダイレクト
-    // ユーザーのプラン種別を判定（月額/年額）
-    const subscriptionType = user.subscriptionType || 'monthly';
-    
-    // 商品IDと使用回数制限のマッピング（月額プラン用）
-    const limitToProductIdMonthly: Record<number, string> = {
-      100: process.env.UTAGE_PRODUCT_ID_100_MONTHLY || process.env.UTAGE_PRODUCT_ID_100 || '', // 100回/日プラン（月額）
-      150: process.env.UTAGE_PRODUCT_ID_150_MONTHLY || process.env.UTAGE_PRODUCT_ID_150 || '', // 150回/日プラン（月額）
-      200: process.env.UTAGE_PRODUCT_ID_200_MONTHLY || process.env.UTAGE_PRODUCT_ID_200 || '', // 200回/日プラン（月額）
-      250: process.env.UTAGE_PRODUCT_ID_250_MONTHLY || process.env.UTAGE_PRODUCT_ID_250 || '', // 250回/日プラン（月額）
-    };
-
-    // 商品IDと使用回数制限のマッピング（年額プラン用）
-    const limitToProductIdYearly: Record<number, string> = {
-      100: process.env.UTAGE_PRODUCT_ID_100_YEARLY || '', // 100回/日プラン（年額）
-      150: process.env.UTAGE_PRODUCT_ID_150_YEARLY || '', // 150回/日プラン（年額）
-      200: process.env.UTAGE_PRODUCT_ID_200_YEARLY || '', // 200回/日プラン（年額）
-      250: process.env.UTAGE_PRODUCT_ID_250_YEARLY || '', // 250回/日プラン（年額）
-    };
-
-    // プラン種別に応じて商品IDを選択
-    const productIdMap = subscriptionType === 'yearly' ? limitToProductIdYearly : limitToProductIdMonthly;
-    const productId = productIdMap[newLimit];
-    
-    if (!productId) {
+    const addonPlan = ADDON_PLANS[newLimit];
+    if (!addonPlan) {
       return NextResponse.json(
-        { error: `指定された制限値に対応する${subscriptionType === 'yearly' ? '年額' : '月額'}商品が見つかりません` },
+        { error: '指定された制限値に対応するプランが見つかりません' },
         { status: 400 }
       );
     }
 
-    // Utageの決済ページURLを生成
-    // Utageの決済ページURL形式: https://utage-system.com/checkout?product_id=XXX&email=XXX
-    const utageCheckoutUrl = process.env.UTAGE_CHECKOUT_BASE_URL || 'https://utage-system.com/checkout';
-    const checkoutUrl = `${utageCheckoutUrl}?product_id=${productId}&email=${encodeURIComponent(user.email)}&redirect_url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/usage-limit/callback?limit=${newLimit}`)}`;
+    const priceId = process.env[addonPlan.priceEnv];
+    if (!priceId) {
+      return NextResponse.json(
+        { error: `${addonPlan.label}の価格設定が見つかりません` },
+        { status: 500 }
+      );
+    }
+
+    const stripe = requireStripe();
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
+
+    // Stripe Checkout Sessionを作成
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer_email: user.email,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: {
+        type: 'addon',
+        daily_limit: String(newLimit),
+        user_id: user.id,
+      },
+      success_url: `${baseUrl}/?upgrade_success=true&limit=${newLimit}`,
+      cancel_url: `${baseUrl}/`,
+    });
 
     return NextResponse.json({
       success: true,
-      checkoutUrl,
-      subscriptionType,
-      message: `Utageの決済ページにリダイレクトします（${subscriptionType === 'yearly' ? '年額' : '月額'}プラン）`,
+      checkoutUrl: session.url,
+      message: `Stripe決済ページにリダイレクトします（${addonPlan.label}）`,
     });
   } catch (error) {
     console.error('Update usage limit error:', error);

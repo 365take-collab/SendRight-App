@@ -460,15 +460,15 @@ export async function grantReferralReward(referredEmail: string): Promise<{ succ
       })
       .eq('id', referral.id);
 
-    // 🎉 Utageに紹介特典メールを自動送信（3人、5人、10人達成時）
-    const utageResult = await sendReferralBonusToUtage(
+    // 🎉 紹介特典メールを自動送信（3人、5人、10人達成時）
+    const bonusResult = await sendReferralBonusViaResend(
       referral.referrer_email,
       newReferralCount,
       oldReferralCount
     );
-    
-    if (utageResult.sent) {
-      console.log(`Utage bonus email sent for threshold ${utageResult.threshold}`);
+
+    if (bonusResult.sent) {
+      console.log(`Referral bonus email sent for threshold ${bonusResult.threshold}`);
     }
 
     return { success: true, freeMonths: newFreeMonths };
@@ -511,44 +511,29 @@ export function generateReferralLink(referralCode: string): string {
 }
 
 // ========================================
-// Utage自動連携（紹介特典メール送信）
+// 紹介特典メール送信（Resend経由）
 // ========================================
 
-// Utageフォーム設定
-const UTAGE_REFERRAL_FORMS: Record<number, { url: string; rid: string; bonusName: string }> = {
-  3: {
-    url: 'https://utage-system.com/r/PdimgvZMchyM/store',
-    rid: 'vOKY9xljNlf3',
-    bonusName: 'モテるLINEテクニック集',
-  },
-  5: {
-    url: 'https://utage-system.com/r/STxiepSXlIXU/store',
-    rid: 'vOKY9xljNlf3',
-    bonusName: 'デート成功率3倍マニュアル',
-  },
-  10: {
-    url: 'https://utage-system.com/r/V0C9cKJ3mO54/store',
-    rid: 'vOKY9xljNlf3',
-    bonusName: '1時間オンライン恋愛コンサル',
-  },
+const REFERRAL_BONUS_THRESHOLDS: Record<number, string> = {
+  3: 'モテるLINEテクニック集',
+  5: 'デート成功率3倍マニュアル',
+  10: '1時間オンライン恋愛コンサル',
 };
 
-// Utageに紹介特典メールを送信
-export async function sendReferralBonusToUtage(
+// 紹介特典メールをResendで送信
+async function sendReferralBonusViaResend(
   email: string,
   newReferralCount: number,
   oldReferralCount: number
 ): Promise<{ sent: boolean; threshold?: number }> {
-  // 閾値をチェック（3, 5, 10）
+  const { sendReferralBonusEmail } = await import('@/lib/resend');
   const thresholds = [3, 5, 10];
-  
+
   for (const threshold of thresholds) {
-    // 新しいカウントが閾値に達し、以前は達していなかった場合
     if (newReferralCount >= threshold && oldReferralCount < threshold) {
-      const form = UTAGE_REFERRAL_FORMS[threshold];
-      
-      if (!form) continue;
-      
+      const bonusName = REFERRAL_BONUS_THRESHOLDS[threshold];
+      if (!bonusName) continue;
+
       try {
         // 既に送信済みかチェック
         const { data: existingBonus } = await getSupabaseClient()
@@ -557,45 +542,32 @@ export async function sendReferralBonusToUtage(
           .eq('user_email', email)
           .eq('bonus_type', `bonus_${threshold}`)
           .single();
-        
+
         if (existingBonus) {
           console.log(`Already sent bonus_${threshold} to ${email}`);
           continue;
         }
-        
-        // Utageにフォーム送信
-        const formData = new URLSearchParams();
-        formData.append('mail', email);
-        formData.append('rid', form.rid);
-        
-        const response = await fetch(form.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: formData.toString(),
-        });
-        
-        console.log(`Utage form submission for ${email} at threshold ${threshold}:`, response.status);
-        
+
+        // Resendでメール送信
+        await sendReferralBonusEmail(email, threshold, bonusName);
+
         // 送信履歴を記録
         await getSupabaseClient()
           .from('sendright_referral_bonuses')
           .insert({
             user_email: email,
             bonus_type: `bonus_${threshold}`,
-            bonus_name: form.bonusName,
-            delivery_method: 'utage_auto',
+            bonus_name: bonusName,
+            delivery_method: 'resend',
           });
-        
-        console.log(`Sent referral bonus (${threshold}) to ${email} via Utage`);
-        
+
+        console.log(`Sent referral bonus (${threshold}) to ${email} via Resend`);
         return { sent: true, threshold };
       } catch (error) {
-        console.error(`Error sending to Utage for ${email} at threshold ${threshold}:`, error);
+        console.error(`Error sending referral bonus for ${email} at threshold ${threshold}:`, error);
       }
     }
   }
-  
+
   return { sent: false };
 }

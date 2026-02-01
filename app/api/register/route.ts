@@ -93,7 +93,6 @@ export async function POST(req: NextRequest) {
     const newUser = await createUser({
       email: normalizedEmail,
       is_subscribed: false, // 無料プラン
-      is_utage_user: false,
       subscription_type: 'free',
       daily_usage_limit: FREE_PLAN_DAILY_LIMIT, // 1日3回まで
       current_streak: 0,

@@ -9,7 +9,7 @@ const nextConfig = {
           // X-Frame-Optionsを削除（Content-Security-Policyで制御）
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.utage-system.com https://utage-system.com http://localhost:*;",
+            value: "frame-ancestors 'self' http://localhost:*;",
           },
         ],
       },

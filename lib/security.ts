@@ -26,7 +26,7 @@ export const RATE_LIMIT_WINDOW = 60 * 1000; // 1分
 export const RATE_LIMIT_MAX_REQUESTS = 3; // 1分間に3回まで（Groq API制限を考慮）
 
 // リクエスト署名検証用のシークレット
-const REQUEST_SIGNATURE_SECRET = process.env.UTAGE_REQUEST_SIGNATURE_SECRET || 'default-secret-change-in-production';
+const REQUEST_SIGNATURE_SECRET = process.env.REQUEST_SIGNATURE_SECRET || 'default-secret-change-in-production';
 
 /**
  * レート制限をチェック
@@ -138,7 +138,7 @@ export function verifyRequestIntegrity(body: string, contentHash?: string): bool
  */
 export function checkIPWhitelist(ip: string): boolean {
   // 環境変数でIPホワイトリストを設定できる（オプション）
-  const whitelist = process.env.UTAGE_IP_WHITELIST;
+  const whitelist = process.env.IP_WHITELIST;
   if (!whitelist) {
     // ホワイトリストが設定されていない場合は、すべてのIPを許可
     return true;
@@ -235,8 +235,6 @@ export function detectAnomalousPattern(
   
   // 4. 不自然なパスパターン（APIエンドポイントへの異常なアクセス）
   const suspiciousPaths = [
-    '/api/auth/utage-login',
-    '/api/webhooks/utage',
     '/api/generate-response',
   ];
   if (suspiciousPaths.includes(requestPath)) {

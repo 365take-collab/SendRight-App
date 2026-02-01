@@ -711,9 +711,7 @@ export async function generateGoalDrivenResponse(context: MessageContext): Promi
   const goalUserPrompt = `【ゴール】${goalLabel}
 
 【会話の状況】
-${context.fullConversationText || context.herMessage}
-
-${context.profileContext ? `【相手の情報】\n${context.profileContext}\n` : ''}
+${context.fullConversationText || context.herMessage}${context.profileContext ? `【相手の情報】\n${context.profileContext}\n` : ''}
 
 【タスク】
 1. 会話の現在の状態を分析（温度感、ゴールまでの距離、最適なタイミング）
@@ -734,9 +732,7 @@ ${context.profileContext ? `【相手の情報】\n${context.profileContext}\n` 
 タイミング: [now/soon/not_yet]
 状況サマリー: [現在の会話状況を2-3文で分析]戦略:
 [「${goalLabel}」を達成するための戦略を2-3文で。具体的なアプローチを提案]今送るべきメッセージ:
-[メッセージ（1-2文、50文字以内、「。」「、」不使用）]
-
-解説:
+[メッセージ（1-2文、50文字以内、「。」「、」不使用）]解説:
 [なぜこのメッセージが効果的か、どう「${goalLabel}」に近づくかを3-4文で]
 
 次の展開:

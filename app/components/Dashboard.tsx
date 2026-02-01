@@ -246,8 +246,7 @@ export default function Dashboard({ token, isDevMode }: DashboardProps) {
                 </div>
                 <button
                   onClick={() => {
-                    // Utageの決済ページにリダイレクト
-                    window.location.href = process.env.NEXT_PUBLIC_UTAGE_CHECKOUT_URL || '/subscribe';
+                    window.location.href = '/subscribe';
                   }}
                   className="px-6 py-3 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full hover:from-pink-400 hover:to-coral-400 transition-all active:scale-95 shadow-md"
                 >

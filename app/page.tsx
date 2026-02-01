@@ -42,50 +42,11 @@ export default function Home() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-  const [isEmbedMode, setIsEmbedMode] = useState(false);
 
 
   useEffect(() => {
     // URLパラメータを取得
     const urlParams = new URLSearchParams(window.location.search);
-    
-    // 埋め込みモードとメールアドレスをURLパラメータから検出
-    const embedMode = urlParams.get('utage_embed') === 'true';
-    const emailFromUrl = urlParams.get('email');
-    
-    if (embedMode) {
-      setIsEmbedMode(true);
-      // 埋め込みモードの場合、Utageアクセスフラグを設定
-      sessionStorage.setItem('utage_access', 'true');
-      
-      // 埋め込みモードではUtageで認証済みなので、ダミーユーザーを設定
-      setUser({
-        id: 'utage-embed-user',
-        email: emailFromUrl || 'utage@example.com',
-        isSubscribed: true,
-      });
-      setToken('utage-embed-token');
-      
-      // エラーをクリア（以前のエラーが残っている場合）
-      setError('');
-      
-      // メールアドレスが有効な場合、自動ログインも試行
-      if (emailFromUrl && emailFromUrl !== '%mail%' && !emailFromUrl.includes('%')) {
-        fetch('/api/auth/utage-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailFromUrl }),
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.token) {
-              localStorage.setItem('token', data.token);
-              setToken(data.token);
-            }
-          })
-          .catch(err => console.error('Auto login error:', err));
-      }
-    }
 
     // ローカルストレージから前提情報を読み込む
     const savedProfileInfo = localStorage.getItem('profileInfo');
@@ -97,7 +58,7 @@ export default function Home() {
       }
     }
 
-    // Utage決済完了後のコールバック処理
+    // 追加課金完了後のコールバック処理
     if (urlParams.get('upgrade_success') === 'true') {
       const limit = urlParams.get('limit');
       if (limit) {
@@ -121,12 +82,6 @@ export default function Home() {
   }, []); // 空の依存配列で一度だけ実行
 
   useEffect(() => {
-    // Utageからのアクセスかチェック
-    const isUtageAccess = sessionStorage.getItem('utage_access') === 'true' || 
-                          document.referrer.includes('utage-system.com') ||
-                          document.referrer.includes('utage.jp') ||
-                          document.referrer.includes('utage.co.jp');
-
     // 開発環境では認証をスキップ
     if (isDevMode) {
       // 開発モード: ダミーユーザーを設定
@@ -136,17 +91,7 @@ export default function Home() {
         isSubscribed: true,
       });
       setToken('dev-token');
-    } else if (isUtageAccess) {
-      // Utageからのアクセス: 認証をスキップしてダミーユーザーを設定
-      // Utage側で既に認証されているため、SendRight側でのログイン処理は不要
-      setUser({
-        id: 'utage-user',
-        email: 'utage@example.com',
-        isSubscribed: true, // Utage側でサブスクリプション状態を管理
-      });
-      setToken('utage-token');
     }
-    // Utage以外からのアクセス: メール登録フォームを表示（page.tsxの下部で処理）
     // ローカルストレージにユーザー情報があれば復元される（別のuseEffectで処理）
 
     // 使用回数情報を取得（開発モードでない場合）
@@ -359,10 +304,8 @@ export default function Home() {
     // すべてのストレージをクリア
     localStorage.removeItem('token');
     localStorage.removeItem('sendright_user');
-    sessionStorage.removeItem('utage_access');
     setUser(null);
     setToken(null);
-    // 注意: setUser(null)により、Utage誘導ページが表示される
   };
 
   const handleStartListening = async () => {
@@ -575,18 +518,16 @@ export default function Home() {
     // すべてのストレージをクリア
     localStorage.removeItem('token');
     localStorage.removeItem('sendright_user');
-    sessionStorage.removeItem('utage_access');
     setUser(null);
     setToken(null);
   };
 
   // エラーが「無効なトークンです」の場合、自動ログアウト
-  // ただし、埋め込みモードの場合はスキップ（Utageで認証済み）
   useEffect(() => {
-    if (error === '無効なトークンです' && !isEmbedMode) {
+    if (error === '無効なトークンです') {
       handleAutoLogout();
     }
-  }, [error, isEmbedMode]);
+  }, [error]);
 
   // メール登録フォーム用の状態
   const [registerEmail, setRegisterEmail] = useState('');
@@ -672,9 +613,8 @@ export default function Home() {
     }
   }, []);
 
-  // ログインしていない場合、Utage誘導ページを表示
-  // ただし、埋め込みモードの場合はUtageで認証済みなのでスキップ
-  if (!user && !isDevMode && !isEmbedMode) {
+  // ログインしていない場合、ログインページを表示
+  if (!user && !isDevMode) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-white via-pink-50/30 to-white relative overflow-hidden flex items-center justify-center">
         {/* 背景 */}
@@ -692,7 +632,7 @@ export default function Home() {
             />
           </div>
           
-          {/* Utage誘導 */}
+          {/* ログイン誘導 */}
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-xl shadow-pink-100/30 p-10">
             <h1 className="text-3xl font-bold text-gray-800 mb-4">
               SendRightへようこそ
@@ -766,8 +706,6 @@ export default function Home() {
       </div>
       
       <div className="relative z-10">
-      {/* 埋め込みモードでない場合のみフルヘッダーを表示 */}
-      {!isEmbedMode ? (
       <nav className="glass-effect border-b border-pink-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex justify-between items-center h-20">
@@ -845,27 +783,8 @@ export default function Home() {
           </div>
         </div>
       </nav>
-      ) : (
-        /* 埋め込みモード用のシンプルヘッダー */
-        <div className="py-4 px-6 border-b border-pink-100">
-          <div className="flex items-center justify-between max-w-5xl mx-auto">
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/sendright-logo.svg" 
-                alt="SendRight" 
-                className="h-8 w-auto"
-              />
-            </div>
-            {usageInfo && (
-              <span className="text-sm text-gray-600">
-                残り{usageInfo.remaining}回
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
-      <main className={`max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 ${isEmbedMode ? 'py-8' : 'py-20'}`}>
+      <main className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 py-20">
         <OnboardingModal />
         
         {/* ダッシュボード（ストリーク・統計表示） */}
@@ -1500,7 +1419,7 @@ export default function Home() {
                     if (response.ok) {
                       const data = await response.json();
                       if (data.checkoutUrl) {
-                        // Utageの決済ページにリダイレクト
+                        // 決済ページにリダイレクト
                         window.location.href = data.checkoutUrl;
                       } else {
                         // フォールバック（直接更新の場合）

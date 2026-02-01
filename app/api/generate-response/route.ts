@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage, BADGES, PLAN_LIMITS } from '@/lib/auth';
 import { findUserById as findUserByIdFromSupabase } from '@/lib/supabase';
 import { generateResponse, generateGoalDrivenResponse, GOALS } from '@/lib/ai';
-import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, checkIPWhitelist, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
+import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
 import { z } from 'zod';
 
 const generateSchema = z.object({
@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
         email: 'dev@example.com',
         isSubscribed: true,
         subscriptionType: 'pro' as const,
-        isUtageUser: false,
         dailyUsageLimit: 999999,
         currentStreak: 0,
         longestStreak: 0,
@@ -59,50 +58,13 @@ export async function POST(request: NextRequest) {
       }
 
       const token = authHeader.substring(7);
-      
-      // 埋め込みモード用トークンの場合は認証をスキップ
-      // Utage会員サイトにログイン済みユーザーからのアクセス
-      const isEmbedToken = token === 'utage-embed-token' || token === 'utage-token';
-      
+
       // メール登録ユーザー用トークン（email-{userId}形式）
       const isEmailToken = token.startsWith('email-');
-      
-      // 埋め込みトークンの場合、Refererをチェック（セキュリティ強化）
-      if (isEmbedToken) {
-        const referer = request.headers.get('referer') || '';
-        const isValidReferer = referer.includes('utage-system.com') || 
-                               referer.includes('utage.jp') || 
-                               referer.includes('sendright.jp') ||
-                               referer.includes('localhost');
-        if (!isValidReferer) {
-          console.warn('Invalid referer for embed token:', referer);
-          return NextResponse.json(
-            { error: '不正なアクセスです' },
-            { status: 403 }
-          );
-        }
-      }
-      
+
       let user = null;
-      
-      if (isEmbedToken) {
-        // 埋め込みモード: ダミーユーザーを使用（Utage会員サイトで認証済み）
-        user = {
-          id: 'utage-embed-user',
-          email: 'utage@example.com',
-          isSubscribed: true,
-          subscriptionType: 'pro' as const,
-          isUtageUser: true,
-          dailyUsageLimit: 50,
-          currentStreak: 0,
-          longestStreak: 0,
-          badges: [],
-          totalUsageCount: 0,
-          successCount: 0,
-          level: 1,
-          createdAt: new Date(),
-        };
-      } else if (isEmailToken) {
+
+      if (isEmailToken) {
         // メール登録ユーザー: Supabaseから直接ユーザーを取得
         const userId = token.substring(6); // 'email-' を除去
         const dbUser = await findUserByIdFromSupabase(userId);
@@ -118,7 +80,6 @@ export async function POST(request: NextRequest) {
           email: dbUser.email,
           isSubscribed: dbUser.is_subscribed,
           subscriptionType: (dbUser.subscription_type || 'free') as 'free' | 'monthly' | 'yearly',
-          isUtageUser: dbUser.is_utage_user,
           dailyUsageLimit: dbUser.daily_usage_limit,
           currentStreak: dbUser.current_streak,
           longestStreak: dbUser.longest_streak,
@@ -145,9 +106,6 @@ export async function POST(request: NextRequest) {
           );
         }
       }
-
-      // Utageユーザーチェックを削除（メールからのログインユーザーも許可）
-      // サブスクリプションチェックのみ残す
 
       // Check subscription (無料プランでも使用可能、制限付き)
       // 無料プランは1日3回まで、有料プランは制限に応じて使用可能
@@ -199,8 +157,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出（埋め込みモード・開発環境ではスキップ）
-      if (!isDevMode && !isEmbedToken) {
+      // 異常なアクセスパターンを検出（開発環境ではスキップ）
+      if (!isDevMode) {
         const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
         if (anomalyResult.isAnomalous) {
           console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
@@ -234,11 +192,11 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const body = JSON.parse(rawBody);
 
-    // リクエストの署名を検証（オプション、Utage側で署名を送信する場合）
+    // リクエストの署名を検証（オプション）
     // 開発環境ではスキップ
     if (!isDevMode) {
-      const signature = request.headers.get('x-utage-signature');
-      const timestamp = request.headers.get('x-utage-timestamp');
+      const signature = request.headers.get('x-request-signature');
+      const timestamp = request.headers.get('x-request-timestamp');
       const contentHash = request.headers.get('x-content-hash');
 
       if (signature && timestamp) {

@@ -102,13 +102,10 @@ export default function ProfileDiagnosisPage() {
 
   useEffect(() => {
     // 認証チェック（簡易版）
-    const isUtageAccess = sessionStorage.getItem('utage_access') === 'true' || 
-                          document.referrer.includes('utage-system.com') ||
-                          document.referrer.includes('utage.jp') ||
-                          document.referrer.includes('utage.co.jp');
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-    
-    if (isDevMode || isUtageAccess) {
+    const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+
+    if (isDevMode || hasToken) {
       setIsAuthenticated(true);
     } else {
       router.push('/login');
