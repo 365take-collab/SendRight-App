@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-// Updated: 2026-02-03 - Testing Codex auto-review hook
+// Updated: 2026-02-03 - Testing Codex auto-review hook v3
 // Stripe設定（必須）
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
