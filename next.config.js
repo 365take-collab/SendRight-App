@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Updated: 2026-02-03 - Testing Codex auto-review hook
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
@@ -6,12 +7,28 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          // X-Frame-Optionsを削除（Content-Security-Policyで制御）
           {
             key: 'Content-Security-Policy',
             value: "frame-ancestors 'self' http://localhost:*;",
           },
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      // sendright.jp → app.sendright.jp へのリダイレクト
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'sendright.jp' }],
+        destination: 'https://app.sendright.jp/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.sendright.jp' }],
+        destination: 'https://app.sendright.jp/:path*',
+        permanent: true,
       },
     ];
   },
