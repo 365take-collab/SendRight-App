@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 
+// Updated: 2026-02-03 - Testing Codex auto-review hook
 // Stripe設定（必須）
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -23,12 +24,12 @@ export async function checkSubscriptionStatus(customerId: string): Promise<{
   isActive: boolean;
   subscription?: Stripe.Subscription;
 }> {
-  // Stripeが設定されていない場合はスキップ
+// Stripeが設定されていない場合はスキップ
   if (!stripe) {
     console.log('Stripe is not configured, skipping subscription check');
     return { isActive: false };
   }
-
+  
   try {
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
