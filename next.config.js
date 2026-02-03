@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Updated: 2026-02-03 - Testing Codex auto-review hook v5 (fixed codex command)
+// Updated: 2026-02-03 - Testing Codex auto-review hook v6 (all P1-P3 fixed)
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
