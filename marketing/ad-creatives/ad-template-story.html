@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SendRight 広告B: ストーリー型</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      align-items: center;
+    }
+    
+    h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .ad-container {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* フィード広告 1080x1080 */
+    .ad-feed {
+      width: 540px;
+      height: 540px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+    }
+    
+    .ad-feed .authority-badge {
+      background: rgba(255, 107, 138, 0.2);
+      border: 1px solid #FF6B8A;
+      color: #FF6B8A;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 50px;
+      margin-bottom: 24px;
+    }
+    
+    .ad-feed .headline {
+      font-size: 36px;
+      font-weight: 900;
+      color: white;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+    
+    .ad-feed .headline .highlight {
+      color: #FF6B8A;
+    }
+    
+    .ad-feed .subheadline {
+      font-size: 18px;
+      color: #999;
+      text-align: center;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+    
+    .ad-feed .cta {
+      background: linear-gradient(135deg, #FF6B8A 0%, #FF8B7B 100%);
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 16px 40px;
+      border-radius: 50px;
+      box-shadow: 0 8px 20px rgba(255, 107, 138, 0.4);
+    }
+    
+    .ad-feed .logo {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #FF6B8A;
+    }
+    
+    /* ストーリーズ広告 1080x1920 */
+    .ad-story {
+      width: 270px;
+      height: 480px;
+      background: linear-gradient(180deg, #FF6B8A 0%, #FF8B7B 50%, #FFA07A 100%);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+    
+    .ad-story .authority-badge {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 50px;
+      margin-bottom: 16px;
+    }
+    
+    .ad-story .headline {
+      font-size: 24px;
+      font-weight: 900;
+      color: white;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    
+    .ad-story .subheadline {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    
+    .ad-story .cta {
+      background: white;
+      color: #FF6B8A;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 14px 32px;
+      border-radius: 50px;
+      margin-bottom: 8px;
+    }
+    
+    .ad-story .cta-sub {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .ad-story .logo {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .ad-story .swipe-up {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .ad-story .swipe-up .arrow {
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>広告B: ストーリー型（フィード 1080x1080）</h2>
+  <div class="ad-container">
+    <div class="ad-feed">
+      <div class="authority-badge">🔥 700人斬りのナンパ師が開発</div>
+      <div class="headline">
+        俺が<span class="highlight">何年</span>もかけて<br>
+        身につけた「正解」を<br>
+        AIに学習させた。
+      </div>
+      <div class="subheadline">
+        返信に悩む30分を、10秒に。<br>
+        恋愛のプロが代わりに考えます。
+      </div>
+      <div class="cta">7日間無料で試す →</div>
+      <div class="logo">SendRight</div>
+    </div>
+  </div>
+  
+  <h2>広告B: ストーリー型（ストーリーズ 1080x1920）</h2>
+  <div class="ad-container">
+    <div class="ad-story">
+      <div class="logo">SendRight</div>
+      <div class="authority-badge">🔥 700人斬りの実績</div>
+      <div class="headline">
+        「正解のパターン」は<br>
+        存在する。
+      </div>
+      <div class="subheadline">
+        数え切れない失敗の末、<br>
+        俺が気づいた答えを<br>
+        AIがあなたに教えます。
+      </div>
+      <div class="cta">無料で使ってみる</div>
+      <div class="cta-sub">※7日間無料トライアル</div>
+      <div class="swipe-up">
+        <span class="arrow">↑</span>
+        <span>スワイプ</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SendRight 広告C: Before/After型</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      align-items: center;
+    }
+    
+    h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .ad-container {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* フィード広告 1080x1080 */
+    .ad-feed {
+      width: 540px;
+      height: 540px;
+      background: white;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .ad-feed .split {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 40px;
+    }
+    
+    .ad-feed .before {
+      background: #f5f5f5;
+    }
+    
+    .ad-feed .after {
+      background: linear-gradient(135deg, #FFF5F7 0%, #FFE8ED 100%);
+    }
+    
+    .ad-feed .content {
+      text-align: center;
+    }
+    
+    .ad-feed .label {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+    
+    .ad-feed .before .label {
+      color: #999;
+    }
+    
+    .ad-feed .after .label {
+      color: #FF6B8A;
+    }
+    
+    .ad-feed .text {
+      font-size: 32px;
+      font-weight: 900;
+      line-height: 1.4;
+    }
+    
+    .ad-feed .before .text {
+      color: #666;
+    }
+    
+    .ad-feed .after .text {
+      color: #1a1a1a;
+    }
+    
+    .ad-feed .after .text .highlight {
+      color: #FF6B8A;
+    }
+    
+    .ad-feed .divider {
+      height: 4px;
+      background: linear-gradient(90deg, #FF6B8A 0%, #FF8B7B 100%);
+      position: relative;
+    }
+    
+    .ad-feed .divider::after {
+      content: '→';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #FF6B8A 0%, #FF8B7B 100%);
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    
+    .ad-feed .cta-bar {
+      background: linear-gradient(135deg, #FF6B8A 0%, #FF8B7B 100%);
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .ad-feed .cta-bar .cta-text {
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .ad-feed .badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: #FF6B8A;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 16px;
+    }
+    
+    .ad-feed .logo {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #FF6B8A;
+    }
+    
+    /* カルーセル広告 1080x1080 x 3枚 */
+    .carousel {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .carousel-card {
+      width: 270px;
+      height: 270px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .carousel-card.card-1 {
+      background: linear-gradient(135deg, #f5f5f5 0%, #eee 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .carousel-card.card-1 .emoji {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .carousel-card.card-1 .text {
+      font-size: 18px;
+      font-weight: 700;
+      color: #666;
+      text-align: center;
+      line-height: 1.4;
+    }
+    
+    .carousel-card.card-2 {
+      background: linear-gradient(135deg, #FF6B8A 0%, #FF8B7B 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .carousel-card.card-2 .text {
+      font-size: 20px;
+      font-weight: 900;
+      color: white;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+    
+    .carousel-card.card-2 .logo {
+      font-size: 14px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.8);
+    }
+    
+    .carousel-card.card-3 {
+      background: linear-gradient(135deg, #FFF5F7 0%, #FFE8ED 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .carousel-card.card-3 .emoji {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .carousel-card.card-3 .text {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    
+    .carousel-card.card-3 .cta {
+      background: linear-gradient(135deg, #FF6B8A 0%, #FF8B7B 100%);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 50px;
+    }
+  </style>
+</head>
+<body>
+  <h2>広告C: Before/After型（フィード 1080x1080）</h2>
+  <div class="ad-container">
+    <div class="ad-feed">
+      <div class="badge">7日間無料</div>
+      <div class="logo">SendRight</div>
+      <div class="split before">
+        <div class="content">
+          <div class="label">BEFORE</div>
+          <div class="text">返信に<br>30分悩む😔</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="split after">
+        <div class="content">
+          <div class="label">AFTER</div>
+          <div class="text"><span class="highlight">10秒</span>で<br>正解がわかる✨</div>
+        </div>
+      </div>
+      <div class="cta-bar">
+        <div class="cta-text">7日間無料で試す →</div>
+      </div>
+    </div>
+  </div>
+  
+  <h2>広告C: Before/After型（カルーセル 1080x1080 x 3枚）</h2>
+  <div class="carousel">
+    <div class="ad-container">
+      <div class="carousel-card card-1">
+        <div class="emoji">😰</div>
+        <div class="text">返信に30分悩んで<br>結局既読スルー…</div>
+      </div>
+    </div>
+    <div class="ad-container">
+      <div class="carousel-card card-2">
+        <div class="text">その悩み、<br>10秒で<br>終わります。</div>
+        <div class="logo">SendRight</div>
+      </div>
+    </div>
+    <div class="ad-container">
+      <div class="carousel-card card-3">
+        <div class="emoji">😊</div>
+        <div class="text">AIが正解を<br>3つ提案します</div>
+        <div class="cta">7日間無料 →</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
