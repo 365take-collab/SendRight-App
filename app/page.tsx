@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit, GOALS, GoalId, GoalDrivenInfo } from '@/lib/api';
-import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, Gift, Target } from 'lucide-react';
+import Image from 'next/image';
+import { generateAIResponse, getCurrentUser, User, extractTextFromImage, AlternativeResponse, getUsageLimit, GOALS, GoalId, GoalDrivenInfo, TONE_PRESETS, TonePreset, submitResponseFeedback } from '@/lib/api';
+import { MessageSquare, LogOut, Crown, Loader2, Mic, MicOff, Image as ImageIcon, X, User as UserIcon, ChevronDown, ChevronUp, Save, Sparkles, ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, Flame, Zap, Gift, Target, AlertTriangle } from 'lucide-react';
 import OnboardingModal from '@/app/components/OnboardingModal';
 import Dashboard from '@/app/components/Dashboard';
 import { recordSuccess } from '@/lib/api';
@@ -37,17 +38,30 @@ export default function Home() {
   const [usageInfo, setUsageInfo] = useState<{ todayCount: number; limit: number; remaining: number } | null>(null);
   // ゴール駆動型の状態
   const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
+  const [selectedTone, setSelectedTone] = useState<TonePreset>('default');
   const [goalDrivenInfo, setGoalDrivenInfo] = useState<GoalDrivenInfo | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [responseId, setResponseId] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 20 }).map((_, i) => ({
+        id: i,
+        left: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 20}s`,
+        animationDuration: `${15 + Math.random() * 10}s`,
+      })),
+    []
+  );
 
 
   useEffect(() => {
     // URLパラメータを取得
     const urlParams = new URLSearchParams(window.location.search);
-
+    
     // ローカルストレージから前提情報を読み込む
     const savedProfileInfo = localStorage.getItem('profileInfo');
     if (savedProfileInfo) {
@@ -58,7 +72,7 @@ export default function Home() {
       }
     }
 
-    // 追加課金完了後のコールバック処理
+    // 決済完了後のコールバック処理
     if (urlParams.get('upgrade_success') === 'true') {
       const limit = urlParams.get('limit');
       if (limit) {
@@ -234,9 +248,13 @@ export default function Home() {
       return;
     }
 
-    // 無料プランでも使用可能（制限付き）
     if (!isDevMode && !token) {
       setError('ログインが必要です');
+      return;
+    }
+
+    if (!isDevMode && user && !user.isSubscribed) {
+      setError('有効なサブスクリプションが必要です');
       return;
     }
     
@@ -251,6 +269,7 @@ export default function Home() {
     setAiResponse('');
     setAiExplanation('');
     setGoalDrivenInfo(null);
+    setResponseId(null);
 
     try {
       // 前提情報を文字列に変換
@@ -266,12 +285,14 @@ export default function Home() {
         undefined, // toneは使わない
         fullConversationText || undefined, // 画像から抽出した会話全体のテキストを渡す
         profileContext, // 前提情報を渡す
-        selectedGoal || undefined // ゴールを渡す
+        selectedGoal || undefined, // ゴールを渡す
+        selectedTone // トーンを渡す
       );
       setAiResponse(result.response);
       setAiExplanation(result.explanation);
       setAlternativeResponses(result.alternatives || []);
       setSelectedResponseIndex(null);
+      setResponseId(result.responseId ?? null);
       // ゴール駆動型の情報を設定
       if (result.goalDriven) {
         setGoalDrivenInfo(result.goalDriven);
@@ -306,6 +327,7 @@ export default function Home() {
     localStorage.removeItem('sendright_user');
     setUser(null);
     setToken(null);
+    // 注意: setUser(null)により、ログイン/登録ページが表示される
   };
 
   const handleStartListening = async () => {
@@ -356,6 +378,11 @@ export default function Home() {
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!isDevMode && user && !user.isSubscribed) {
+      setError('有効なサブスクリプションが必要です');
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -455,28 +482,33 @@ export default function Home() {
               setError('');
               setAiResponse('');
               setAiExplanation('');
+              setGoalDrivenInfo(null);
+              setResponseId(null);
               
               // 前提情報を文字列に変換
               const profileContext = Object.values(profileInfo).some(v => v.trim()) 
                 ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
                 : undefined;
               
-                          const responseResult = await generateAIResponse(
-                            token || 'dev-token', 
-                            result.message, 
-                            undefined,
-                            undefined,
-                            result.extractedText || undefined,
-                            profileContext,
-                            selectedGoal || undefined // ゴールを渡す
-                          );
-                          setAiResponse(responseResult.response);
-                          setAiExplanation(responseResult.explanation);
-                          setAlternativeResponses(responseResult.alternatives || []);
-                          // ゴール駆動型の情報を設定
-                          if (responseResult.goalDriven) {
-                            setGoalDrivenInfo(responseResult.goalDriven);
-                          }
+              const responseResult = await generateAIResponse(
+                token || 'dev-token', 
+                result.message, 
+                undefined,
+                undefined,
+                result.extractedText || undefined,
+                profileContext,
+                selectedGoal || undefined,
+                selectedTone
+              );
+              setAiResponse(responseResult.response);
+              setAiExplanation(responseResult.explanation);
+              setAlternativeResponses(responseResult.alternatives || []);
+              setSelectedResponseIndex(null);
+              setResponseId(responseResult.responseId ?? null);
+              // ゴール駆動型の情報を設定
+              if (responseResult.goalDriven) {
+                setGoalDrivenInfo(responseResult.goalDriven);
+              }
             } catch (err) {
               setError(err instanceof Error ? err.message : '返信の生成に失敗しました');
             } finally {
@@ -613,7 +645,7 @@ export default function Home() {
     }
   }, []);
 
-  // ログインしていない場合、ログインページを表示
+  // ログインしていない場合、ログイン/登録ページを表示
   if (!user && !isDevMode) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-white via-pink-50/30 to-white relative overflow-hidden flex items-center justify-center">
@@ -625,14 +657,17 @@ export default function Home() {
         <div className="relative z-10 max-w-lg mx-auto px-6 text-center">
           {/* ロゴ */}
           <div className="mb-8">
-            <img 
-              src="/sendright-logo.svg" 
-              alt="SendRight" 
+            <Image
+              src="/sendright-logo.svg"
+              alt="SendRight"
+              width={256}
+              height={64}
               className="h-16 w-auto mx-auto"
+              priority
             />
           </div>
           
-          {/* ログイン誘導 */}
+          {/* ログイン/登録 */}
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-xl shadow-pink-100/30 p-10">
             <h1 className="text-3xl font-bold text-gray-800 mb-4">
               SendRightへようこそ
@@ -669,13 +704,13 @@ export default function Home() {
               href="/login"
               className="inline-block w-full py-3 bg-white border-2 border-pink-300 text-pink-500 font-bold rounded-xl hover:bg-pink-50 transition-all text-center"
             >
-              会員サイトからログイン
+              ログインする
             </a>
           </div>
           
           {/* フッター */}
           <p className="text-xs text-gray-500 mt-8">
-            © 2024 SendRight. All rights reserved.
+            © 2025 SendRight. All rights reserved.
           </p>
         </div>
       </div>
@@ -692,14 +727,14 @@ export default function Home() {
       
       {/* パーティクル背景 */}
       <div className="particle-bg">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {particles.map((particle) => (
           <div
-            key={i}
+            key={particle.id}
             className="particle"
             style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 20}s`,
-              animationDuration: `${15 + Math.random() * 10}s`,
+              left: particle.left,
+              animationDelay: particle.animationDelay,
+              animationDuration: particle.animationDuration,
             }}
           />
         ))}
@@ -711,9 +746,11 @@ export default function Home() {
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-4">
               <Link href="/" className="flex items-center space-x-3">
-                <img 
-                  src="/sendright-logo.svg" 
-                  alt="SendRight" 
+                <Image
+                  src="/sendright-logo.svg"
+                  alt="SendRight"
+                  width={192}
+                  height={48}
                   className="h-12 w-auto"
                 />
               </Link>
@@ -734,9 +771,9 @@ export default function Home() {
                     ) : (
                       <Zap className="w-5 h-5 mr-2 text-pink-500" />
                     )}
-                    {isDevMode ? '開発モード' : user?.isSubscribed ? 'プロ会員' : '無料プラン'}
+                    {isDevMode ? '開発モード' : user?.isSubscribed ? 'プロ会員' : '未契約'}
                   </span>
-                  {usageInfo && !isDevMode && (
+                  {usageInfo && !isDevMode && user?.isSubscribed && (
                     <div className="flex flex-col items-end gap-1">
                       <span className="flex items-center text-sm text-gray-600 font-medium">
                         <span className="mr-1">今日の使用回数:</span>
@@ -812,12 +849,12 @@ export default function Home() {
             <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl text-red-600">
               <p className="mb-4 text-lg">{error}</p>
               {usageInfo && usageInfo.remaining === 0 && !isDevMode && (
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="px-4 py-2 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full text-sm hover:from-pink-400 hover:to-coral-400 transition-all"
-                >
-                  アップグレードして制限を解除
-                </button>
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-coral-500 text-white font-bold rounded-full text-sm hover:from-pink-400 hover:to-coral-400 transition-all"
+                  >
+                    上限アップについて
+                  </button>
               )}
             </div>
           )}
@@ -968,6 +1005,39 @@ export default function Home() {
                 </p>
               )}
             </div>
+
+            {/* 返信トーン選択 */}
+            <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-2xl border border-sky-200 p-6 fade-in-up" style={{ animationDelay: '0.18s' }}>
+              <div className="flex items-center space-x-3 mb-4">
+                <Sparkles className="w-6 h-6 text-sky-500" />
+                <label className="text-lg font-bold text-gray-800 tracking-tight">
+                  ✨ 返信トーン（オプション）
+                </label>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                トーンを選ぶと返信の雰囲気を調整できます
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {TONE_PRESETS.map((tone) => (
+                  <button
+                    key={tone.id}
+                    onClick={() => setSelectedTone(tone.id)}
+                    className={`p-3 rounded-xl border transition-all text-left ${
+                      selectedTone === tone.id
+                        ? 'bg-sky-100 border-sky-400 text-sky-700 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-sky-200 hover:bg-sky-50'
+                    }`}
+                  >
+                    <span className="font-medium text-sm">{tone.label}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedTone !== 'default' && (
+                <p className="mt-4 text-sm text-sky-600 font-medium">
+                  ✅ 選択中: {TONE_PRESETS.find(t => t.id === selectedTone)?.label}
+                </p>
+              )}
+            </div>
             
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -997,14 +1067,14 @@ export default function Home() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  disabled={(!user && !isDevMode) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
+                  disabled={(!user && !isDevMode) || (!isDevMode && user && !user.isSubscribed) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                   className="hidden"
                   id="image-upload"
                 />
                 <label
                   htmlFor="image-upload"
                   className={`inline-flex items-center px-6 py-3.5 border rounded-full cursor-pointer transition-all duration-300 font-medium ${
-                    (!user && !isDevMode) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)
+                    (!user && !isDevMode) || (!isDevMode && user && !user.isSubscribed) || isExtracting || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                       : 'bg-white text-gray-700 hover:bg-pink-50 border-gray-200 hover:border-pink-300 active:scale-95 shadow-sm'
                   }`}
@@ -1014,10 +1084,13 @@ export default function Home() {
                 </label>
                 {uploadedImage && (
                   <div className="mt-6 relative inline-block">
-                    <img
+                    <Image
                       src={uploadedImage}
                       alt="アップロードされた画像"
-                      className="max-w-full h-auto max-h-80 rounded-2xl border border-gray-200 shadow-lg"
+                      width={320}
+                      height={320}
+                      className="max-w-full h-auto max-h-80 rounded-2xl border border-gray-200 shadow-lg object-contain"
+                      unoptimized
                     />
                     <button
                       onClick={handleRemoveImage}
@@ -1059,12 +1132,12 @@ export default function Home() {
                   placeholder="例: おはよう！今日は何してる？"
                   className="apple-tv-input w-full px-6 py-4 pr-14 text-gray-800 rounded-2xl resize-none placeholder:text-gray-400 text-lg"
                   rows={5}
-                  disabled={(!user && !isDevMode) || isLoading || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
+                  disabled={(!user && !isDevMode) || (!isDevMode && user && !user.isSubscribed) || isLoading || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                 />
                 <button
                   type="button"
                   onClick={isListening ? handleStopListening : handleStartListening}
-                  disabled={(!user && !isDevMode) || isLoading || !isSpeechSupported || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
+                  disabled={(!user && !isDevMode) || (!isDevMode && user && !user.isSubscribed) || isLoading || !isSpeechSupported || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                   className={`absolute right-4 top-4 p-3 rounded-full transition-all duration-300 ${
                     isListening
                       ? 'bg-red-500 text-white hover:bg-red-400'
@@ -1096,7 +1169,28 @@ export default function Home() {
             </div>
 
             <div className="space-y-3">
-              {usageInfo && !isDevMode && usageInfo.remaining <= 5 && usageInfo.remaining > 0 && (
+              {!isDevMode && user && !user.isSubscribed && (
+                <div className="p-5 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-start">
+                    <Crown className="w-6 h-6 text-purple-500 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-800 font-bold mb-1">
+                        有効なサブスクリプションが必要です
+                      </p>
+                      <p className="text-sm text-gray-600 mb-3">
+                        課金後にすべての機能が利用できます
+                      </p>
+                      <button
+                        onClick={() => router.push('/subscribe')}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-full text-sm hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95"
+                      >
+                        今すぐ申し込む
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {usageInfo && !isDevMode && user?.isSubscribed && usageInfo.remaining <= 5 && usageInfo.remaining > 0 && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-700">
                   <p className="text-sm font-medium mb-2">
                     ⚠️ 残り使用回数が少なくなっています: {usageInfo.remaining}回（制限: {usageInfo.limit}回/日）
@@ -1109,7 +1203,7 @@ export default function Home() {
                   </button>
                 </div>
               )}
-              {usageInfo && !isDevMode && usageInfo.remaining === 0 && (
+              {usageInfo && !isDevMode && user?.isSubscribed && usageInfo.remaining === 0 && (
                 <div className="p-5 bg-gradient-to-r from-pink-50 to-coral-50 border border-pink-200 rounded-xl">
                   <div className="flex items-start">
                     <Zap className="w-6 h-6 text-pink-500 mr-3 mt-0.5 flex-shrink-0" />
@@ -1136,7 +1230,7 @@ export default function Home() {
               )}
               <button
                 onClick={handleGenerate}
-                disabled={(!user && !isDevMode) || isLoading || !herMessage.trim() || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
+                disabled={(!user && !isDevMode) || (!isDevMode && user && !user.isSubscribed) || isLoading || !herMessage.trim() || (usageInfo !== null && !isDevMode && usageInfo.remaining === 0)}
                 className="w-full apple-button-primary flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -1221,6 +1315,7 @@ export default function Home() {
                       onClick={async () => {
                         setIsLoading(true);
                         setGoalDrivenInfo(null);
+                        setResponseId(null);
                         try {
                           const profileContext = Object.values(profileInfo).some(v => v.trim()) 
                             ? `【前提情報】\n${profileInfo.name ? `名前: ${profileInfo.name}\n` : ''}${profileInfo.age ? `年齢: ${profileInfo.age}\n` : ''}${profileInfo.relationship ? `関係性: ${profileInfo.relationship}\n` : ''}${profileInfo.interests ? `趣味・好み: ${profileInfo.interests}\n` : ''}${profileInfo.personality ? `性格・特徴: ${profileInfo.personality}\n` : ''}${profileInfo.context ? `会話の文脈・背景: ${profileInfo.context}\n` : ''}`
@@ -1232,11 +1327,14 @@ export default function Home() {
                             undefined,
                             fullConversationText || undefined,
                             profileContext,
-                            selectedGoal || undefined // ゴールを渡す
+                            selectedGoal || undefined,
+                            selectedTone
                           );
                           setAiResponse(result.response);
                           setAiExplanation(result.explanation);
                           setAlternativeResponses(result.alternatives || []);
+                          setSelectedResponseIndex(null);
+                          setResponseId(result.responseId ?? null);
                           // ゴール駆動型の情報を設定
                           if (result.goalDriven) {
                             setGoalDrivenInfo(result.goalDriven);
@@ -1287,6 +1385,18 @@ export default function Home() {
                               const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
                               savedFeedback.push(feedback);
                               localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
+
+                              if (token && responseId && !isDevMode) {
+                                try {
+                                  await submitResponseFeedback(token, {
+                                    responseId,
+                                    rating: 'good',
+                                    tags: ['primary'],
+                                  });
+                                } catch (err) {
+                                  console.error('Failed to submit feedback:', err);
+                                }
+                              }
                               
                               // 成功を記録（バッジ獲得のため）
                               if (token && !isDevMode) {
@@ -1311,11 +1421,22 @@ export default function Home() {
                             <ThumbsUp className="w-4 h-4" />
                           </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             const feedback = { response: aiResponse, rating: 'bad', timestamp: Date.now() };
                             const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
                             savedFeedback.push(feedback);
                             localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
+                            if (token && responseId && !isDevMode) {
+                              try {
+                                await submitResponseFeedback(token, {
+                                  responseId,
+                                  rating: 'bad',
+                                  tags: ['primary'],
+                                });
+                              } catch (err) {
+                                console.error('Failed to submit feedback:', err);
+                              }
+                            }
                             alert('評価を保存しました。改善に活用します。');
                           }}
                           className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-full hover:bg-red-100 transition-all active:scale-95"
@@ -1355,11 +1476,22 @@ export default function Home() {
                             コピー
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               const feedback = { response: alt.response, rating: 'good', timestamp: Date.now() };
                               const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
                               savedFeedback.push(feedback);
                               localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
+                              if (token && responseId && !isDevMode) {
+                                try {
+                                  await submitResponseFeedback(token, {
+                                    responseId,
+                                    rating: 'good',
+                                    tags: ['alternative', `index:${idx + 2}`],
+                                  });
+                                } catch (err) {
+                                  console.error('Failed to submit feedback:', err);
+                                }
+                              }
                               alert('評価を保存しました');
                             }}
                             className="px-3 py-2 bg-green-50 border border-green-200 text-green-600 rounded-full hover:bg-green-100 transition-all active:scale-95"
@@ -1368,11 +1500,22 @@ export default function Home() {
                             <ThumbsUp className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               const feedback = { response: alt.response, rating: 'bad', timestamp: Date.now() };
                               const savedFeedback = JSON.parse(localStorage.getItem('responseFeedback') || '[]');
                               savedFeedback.push(feedback);
                               localStorage.setItem('responseFeedback', JSON.stringify(savedFeedback.slice(-100)));
+                              if (token && responseId && !isDevMode) {
+                                try {
+                                  await submitResponseFeedback(token, {
+                                    responseId,
+                                    rating: 'bad',
+                                    tags: ['alternative', `index:${idx + 2}`],
+                                  });
+                                } catch (err) {
+                                  console.error('Failed to submit feedback:', err);
+                                }
+                              }
                               alert('評価を保存しました。改善に活用します。');
                             }}
                             className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-full hover:bg-red-100 transition-all active:scale-95"
@@ -1400,171 +1543,11 @@ export default function Home() {
               現在の制限: <span className="font-bold text-gray-800">{usageInfo?.limit || 50}回/日</span>
             </p>
             <p className="text-gray-500 text-sm mb-6">
-              ※ 追加課金は現在のプラン（月額/年額）に合わせて適用されます
+              ※ 追加課金による上限アップは現在停止中です
             </p>
-            
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={async () => {
-                  if (!token) return;
-                  try {
-                    const response = await fetch('/api/usage-limit', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ newLimit: 100 }),
-                    });
-                    if (response.ok) {
-                      const data = await response.json();
-                      if (data.checkoutUrl) {
-                        // 決済ページにリダイレクト
-                        window.location.href = data.checkoutUrl;
-                      } else {
-                        // フォールバック（直接更新の場合）
-                        setUsageInfo(data.usageInfo);
-                        setShowUpgradeModal(false);
-                        alert(`使用回数制限を100回に増やしました！`);
-                      }
-                    } else {
-                      const error = await response.json();
-                      alert(error.error || '更新に失敗しました');
-                    }
-                  } catch (err) {
-                    alert('エラーが発生しました');
-                  }
-                }}
-                className="w-full p-4 bg-pink-50 border border-pink-200 rounded-xl text-left hover:bg-pink-100 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800">100回/日プラン</p>
-                    <p className="text-sm text-gray-500">月額 +¥6,980</p>
-                  </div>
-                  <span className="text-pink-500 font-bold">+50回</span>
-                </div>
-              </button>
 
-              <button
-                onClick={async () => {
-                  if (!token) return;
-                  try {
-                    const response = await fetch('/api/usage-limit', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ newLimit: 150 }),
-                    });
-                    if (response.ok) {
-                      const data = await response.json();
-                      if (data.checkoutUrl) {
-                        window.location.href = data.checkoutUrl;
-                      } else {
-                        setUsageInfo(data.usageInfo);
-                        setShowUpgradeModal(false);
-                        alert(`使用回数制限を150回に増やしました！`);
-                      }
-                    } else {
-                      const error = await response.json();
-                      alert(error.error || '更新に失敗しました');
-                    }
-                  } catch (err) {
-                    alert('エラーが発生しました');
-                  }
-                }}
-                className="w-full p-4 bg-green-50 border border-green-200 rounded-xl text-left hover:bg-green-100 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800">150回/日プラン</p>
-                    <p className="text-sm text-gray-500">月額 +¥13,960（2倍）</p>
-                  </div>
-                  <span className="text-green-600 font-bold">+100回</span>
-                </div>
-              </button>
-
-              <button
-                onClick={async () => {
-                  if (!token) return;
-                  try {
-                    const response = await fetch('/api/usage-limit', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ newLimit: 200 }),
-                    });
-                    if (response.ok) {
-                      const data = await response.json();
-                      if (data.checkoutUrl) {
-                        window.location.href = data.checkoutUrl;
-                      } else {
-                        setUsageInfo(data.usageInfo);
-                        setShowUpgradeModal(false);
-                        alert(`使用回数制限を200回に増やしました！`);
-                      }
-                    } else {
-                      const error = await response.json();
-                      alert(error.error || '更新に失敗しました');
-                    }
-                  } catch (err) {
-                    alert('エラーが発生しました');
-                  }
-                }}
-                className="w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-left hover:bg-purple-100 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800">200回/日プラン</p>
-                    <p className="text-sm text-gray-500">月額 +¥20,940（3倍）</p>
-                  </div>
-                  <span className="text-purple-600 font-bold">+150回</span>
-                </div>
-              </button>
-
-              <button
-                onClick={async () => {
-                  if (!token) return;
-                  try {
-                    const response = await fetch('/api/usage-limit', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ newLimit: 250 }),
-                    });
-                    if (response.ok) {
-                      const data = await response.json();
-                      if (data.checkoutUrl) {
-                        window.location.href = data.checkoutUrl;
-                      } else {
-                        setUsageInfo(data.usageInfo);
-                        setShowUpgradeModal(false);
-                        alert(`使用回数制限を250回に増やしました！`);
-                      }
-                    } else {
-                      const error = await response.json();
-                      alert(error.error || '更新に失敗しました');
-                    }
-                  } catch (err) {
-                    alert('エラーが発生しました');
-                  }
-                }}
-                className="w-full p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-left hover:bg-yellow-100 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800">250回/日プラン</p>
-                    <p className="text-sm text-gray-500">月額 +¥27,920（4倍）</p>
-                  </div>
-                  <span className="text-yellow-600 font-bold">+200回</span>
-                </div>
-              </button>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 mb-6">
+              上限アップをご希望の場合は、運営までお問い合わせください。
             </div>
 
             <button
@@ -1580,6 +1563,3 @@ export default function Home() {
     </div>
   );
 }
-
-
-

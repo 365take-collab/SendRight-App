@@ -1,8 +1,17 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import * as db from './supabase';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = (() => {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is required in production');
+  }
+  return 'dev-only-secret';
+})();
 
 // ========================================
 // 型定義（後方互換性のため維持）
@@ -70,16 +79,6 @@ export const BADGES = {
 // ヘルパー関数
 // ========================================
 
-// ランダムな初期パスワードを生成（英数字8文字）
-export function generateInitialPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let password = '';
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
-}
-
 export function calculateLevel(totalUsageCount: number): number {
   if (totalUsageCount >= 1000) return 10;
   if (totalUsageCount >= 500) return 9;
@@ -141,6 +140,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
+export function generateInitialPassword(length: number = 12): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(length);
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return result;
+}
+
 export function generateToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
 }
@@ -159,7 +168,7 @@ export function verifyToken(token: string): { userId: string } | null {
 
 export async function createUser(email: string, password?: string): Promise<User> {
   const passwordHash = password ? await hashPassword(password) : undefined;
-
+  
   const dbUser = await db.createUser({
     email,
     password_hash: passwordHash || null,
@@ -235,8 +244,7 @@ export async function updateDailyUsageLimit(userId: string, newLimit: number): P
 }
 
 export async function decrementUsageCount(userId: string): Promise<void> {
-  // Supabase版では実装省略（必要に応じて追加）
-  console.warn('decrementUsageCount is not implemented for Supabase');
+  await db.decrementUsageCount(userId);
 }
 
 // ========================================

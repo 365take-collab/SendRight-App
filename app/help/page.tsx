@@ -52,8 +52,8 @@ export default function HelpPage() {
                       1
                     </span>
                     <div>
-                      <p className="font-medium text-gray-800 mb-1">購入完了メールを確認</p>
-                      <p className="text-sm text-gray-500">購入時に届くメールに記載されたメールアドレスとパスワードを確認してください。</p>
+                      <p className="font-medium text-gray-800 mb-1">ログインページにアクセス</p>
+                      <p className="text-sm text-gray-500">`/login` からメールアドレスとパスワードでログインしてください。</p>
                     </div>
                   </li>
                   <li className="flex items-start">
@@ -61,8 +61,8 @@ export default function HelpPage() {
                       2
                     </span>
                     <div>
-                      <p className="font-medium text-gray-800 mb-1">SendRightにログイン</p>
-                      <p className="text-sm text-gray-500">ログインページからメールアドレスとパスワードを入力してログインしてください。</p>
+                      <p className="font-medium text-gray-800 mb-1">ログイン情報の保存</p>
+                      <p className="text-sm text-gray-500">ログイン状態はブラウザに保存され、次回以降は自動でログインされます。</p>
                     </div>
                   </li>
                   <li className="flex items-start">
@@ -70,11 +70,16 @@ export default function HelpPage() {
                       3
                     </span>
                     <div>
-                      <p className="font-medium text-gray-800 mb-1">すぐに使い始められます</p>
-                      <p className="text-sm text-gray-500">ログイン後は、SendRightの全機能をご利用いただけます。</p>
+                      <p className="font-medium text-gray-800 mb-1">無料登録ユーザーの場合</p>
+                      <p className="text-sm text-gray-500">ホーム画面のメール登録から無料で利用開始できます。</p>
                     </div>
                   </li>
                 </ol>
+                <div className="mt-6 p-4 bg-pink-50 border border-pink-200 rounded-lg">
+                  <p className="text-sm text-pink-700">
+                    <strong>注意：</strong> ログインできない場合は、`/login` から再度ログインしてください。
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -250,25 +255,16 @@ export default function HelpPage() {
                     A: 1日あたり50回まで使用できます（デフォルト）。使用回数と残り回数はヘッダーに表示されます。
                   </p>
                   <p className="text-gray-600 text-sm">
-                    <strong>追加課金で使用回数を増やすことができます（100回ごとに倍額）：</strong>
-                  </p>
-                  <ul className="text-gray-600 text-sm ml-4 mt-2 space-y-1">
-                    <li>• 100回/日プラン（月額+¥6,980、+50回）</li>
-                    <li>• 150回/日プラン（月額+¥13,960、+100回・2倍）</li>
-                    <li>• 200回/日プラン（月額+¥20,940、+150回・3倍）</li>
-                    <li>• 250回/日プラン（月額+¥27,920、+200回・4倍）</li>
-                  </ul>
-                  <p className="text-gray-500 text-xs mt-2">
-                    ※ 50回ごとに¥6,980追加（基本プラン月額¥6,980に追加）
+                    <strong>追加課金による上限アップは現在停止中です。</strong>
                   </p>
                   <p className="text-gray-500 text-xs mt-2">
-                    制限に達した場合や残り回数が少ない場合、警告メッセージから追加課金で使用回数を増やすことができます。
+                    上限アップをご希望の場合は、運営までお問い合わせください。
                   </p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">Q: セッションが切れた場合はどうすればいいですか？</h3>
                   <p className="text-gray-600 text-sm">
-                    A: ログインページから再度ログインしてください。セッションは7日間有効です。
+                    A: `/login` から再度ログインしてください。
                   </p>
                 </div>
                 <div>

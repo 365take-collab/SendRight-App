@@ -26,7 +26,24 @@ export const RATE_LIMIT_WINDOW = 60 * 1000; // 1分
 export const RATE_LIMIT_MAX_REQUESTS = 3; // 1分間に3回まで（Groq API制限を考慮）
 
 // リクエスト署名検証用のシークレット
-const REQUEST_SIGNATURE_SECRET = process.env.REQUEST_SIGNATURE_SECRET || 'default-secret-change-in-production';
+const REQUEST_SIGNATURE_SECRET = (() => {
+  if (process.env.REQUEST_SIGNATURE_SECRET) {
+    return process.env.REQUEST_SIGNATURE_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('REQUEST_SIGNATURE_SECRET is required in production');
+  }
+  return 'dev-only-secret';
+})();
+
+function safeTimingEqual(a: string, b: string): boolean {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+  if (aBuffer.length !== bBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(aBuffer, bBuffer);
+}
 
 /**
  * レート制限をチェック
@@ -106,10 +123,7 @@ export function verifyRequestSignature(
     .digest('hex');
 
   // 署名を比較（タイミング攻撃を防ぐため、定数時間比較を使用）
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
+  return safeTimingEqual(signature, expectedSignature);
 }
 
 /**
@@ -125,10 +139,7 @@ export function verifyRequestIntegrity(body: string, contentHash?: string): bool
   }
 
   const expectedHash = crypto.createHash('sha256').update(body).digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(contentHash),
-    Buffer.from(expectedHash)
-  );
+  return safeTimingEqual(contentHash, expectedHash);
 }
 
 /**

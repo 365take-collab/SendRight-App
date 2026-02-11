@@ -183,7 +183,7 @@ export async function middleware(request: NextRequest) {
       reason: anomalyCheck.reason,
       timestamp: new Date(timestamp).toISOString(),
     });
-
+    
     // 異常検出の場合は403を返す（開発環境では警告のみ）
     if (process.env.NODE_ENV === 'production') {
       return new NextResponse(getAccessDeniedHTML('異常なアクセスパターンが検出されました。再度ログインしてください。', true), {
@@ -209,23 +209,23 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/help'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
-  // 保護されたページへのアクセスにはトークン（JWT）が必要
+  // 保護されたページへのアクセスにはトークンが必要
   if (isProtectedPath) {
     const authToken = request.cookies.get('token')?.value;
-
+    
     // トークンがない場合はアクセス拒否
     if (!authToken) {
       console.warn('認証なしでの保護ページへのアクセスを拒否:', {
         pathname: request.nextUrl.pathname,
         hasToken: !!authToken,
       });
-
+      
       return new NextResponse(getAccessDeniedHTML('このページへのアクセスにはログインが必要です。', true), {
         status: 403,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
     }
-
+    
     console.log('認証OK: アクセス許可', {
       pathname: request.nextUrl.pathname,
       hasToken: !!authToken,

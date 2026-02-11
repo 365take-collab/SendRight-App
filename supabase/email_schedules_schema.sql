@@ -11,7 +11,11 @@ CREATE TABLE IF NOT EXISTS email_schedules (
   email_type TEXT NOT NULL, -- 'welcome', 'day1', 'day3', 'day7', 'day14', 'day30'
   scheduled_at TIMESTAMPTZ NOT NULL,
   sent_at TIMESTAMPTZ,
-  status TEXT DEFAULT 'pending', -- 'pending', 'sent', 'failed', 'cancelled'
+  status TEXT DEFAULT 'pending', -- 'pending', 'processing', 'sent', 'failed', 'cancelled'
+  send_attempts INTEGER DEFAULT 0,
+  last_error TEXT,
+  processing_started_at TIMESTAMPTZ,
+  processing_id TEXT,
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -22,6 +26,13 @@ CREATE INDEX IF NOT EXISTS idx_email_schedules_user_id ON email_schedules(user_i
 CREATE INDEX IF NOT EXISTS idx_email_schedules_email ON email_schedules(email);
 CREATE INDEX IF NOT EXISTS idx_email_schedules_status ON email_schedules(status);
 CREATE INDEX IF NOT EXISTS idx_email_schedules_scheduled_at ON email_schedules(scheduled_at);
+
+-- 既存テーブルへの追加カラム（マイグレーション用）
+ALTER TABLE email_schedules
+  ADD COLUMN IF NOT EXISTS send_attempts INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_error TEXT,
+  ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS processing_id TEXT;
 
 -- 送信済みメール履歴テーブル（重複送信防止）
 CREATE TABLE IF NOT EXISTS email_sent_history (

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage, BADGES, PLAN_LIMITS } from '@/lib/auth';
-import { findUserById as findUserByIdFromSupabase } from '@/lib/supabase';
-import { generateResponse, generateGoalDrivenResponse, GOALS } from '@/lib/ai';
-import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
+import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo, decrementUsageCount, updateStreak, recordUsage } from '@/lib/auth';
+import { generateResponse, generateGoalDrivenResponse, GOALS, getAiProviderInfo } from '@/lib/ai';
+import { checkRateLimit, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
+import { createResponseHistory } from '@/lib/supabase';
+import { findSimilarSuccessPatterns } from '@/lib/success-patterns';
 import { z } from 'zod';
+
+const TONE_PRESETS = ['default', 'casual', 'gentle', 'direct', 'playful', 'polite'] as const;
 
 const generateSchema = z.object({
   herMessage: z.string().min(1, 'メッセージを入力してください'),
@@ -14,6 +17,7 @@ const generateSchema = z.object({
   fullConversationText: z.string().optional(), // 画像から抽出した会話全体のテキスト
   profileContext: z.string().optional(), // 前提情報（名前、年齢、関係性など）
   goal: z.string().optional(), // ゴール（デートに誘いたい、LINE交換したい、など）
+  tone: z.enum(TONE_PRESETS).optional(), // 返信トーン
 });
 
 export async function POST(request: NextRequest) {
@@ -23,10 +27,11 @@ export async function POST(request: NextRequest) {
                       request.nextUrl.hostname === 'localhost' ||
                       request.nextUrl.hostname.includes('ngrok');
 
-    // 開発環境ではすべてのセキュリティチェックをスキップ
+    let user: Awaited<ReturnType<typeof findUserById>> | null = null;
+
+    // 開発環境では認証をスキップ
     if (isDevMode) {
-      // 開発環境: ダミーユーザーを設定してすべてのチェックをスキップ
-      const devUser = {
+      user = {
         id: 'dev-user',
         email: 'dev@example.com',
         isSubscribed: true,
@@ -40,15 +45,7 @@ export async function POST(request: NextRequest) {
         level: 1,
         createdAt: new Date(),
       };
-      
-      // 開発環境ではすべてのチェックをスキップして処理を続行
-      // 後続の処理で user 変数を使用するため、ここで設定
-      var user = devUser;
     } else {
-    // 認証チェック（本番環境のみ）
-    // 注意: refererやIPチェックは削除。認証トークンがあれば十分。
-    // メールからのログインユーザーも使えるようにする。
-      // Check authentication
       const authHeader = request.headers.get('authorization');
       if (!authHeader?.startsWith('Bearer ')) {
         return NextResponse.json(
@@ -59,36 +56,9 @@ export async function POST(request: NextRequest) {
 
       const token = authHeader.substring(7);
 
-      // メール登録ユーザー用トークン（email-{userId}形式）
-      const isEmailToken = token.startsWith('email-');
-
-      let user = null;
-
-      if (isEmailToken) {
-        // メール登録ユーザー: Supabaseから直接ユーザーを取得
-        const userId = token.substring(6); // 'email-' を除去
-        const dbUser = await findUserByIdFromSupabase(userId);
-        if (!dbUser) {
-          return NextResponse.json(
-            { error: 'ユーザーが見つかりません' },
-            { status: 404 }
-          );
-        }
-        // DbUser型をUser型に変換
-        user = {
-          id: dbUser.id,
-          email: dbUser.email,
-          isSubscribed: dbUser.is_subscribed,
-          subscriptionType: (dbUser.subscription_type || 'free') as 'free' | 'monthly' | 'yearly',
-          dailyUsageLimit: dbUser.daily_usage_limit,
-          currentStreak: dbUser.current_streak,
-          longestStreak: dbUser.longest_streak,
-          badges: dbUser.badges || [],
-          totalUsageCount: dbUser.total_usage_count,
-          successCount: dbUser.success_count,
-          level: dbUser.level,
-          createdAt: new Date(dbUser.created_at),
-        };
+      if (token.startsWith('email-')) {
+        const userId = token.substring(6);
+        user = await findUserById(userId);
       } else {
         const decoded = verifyToken(token);
         if (!decoded) {
@@ -97,31 +67,23 @@ export async function POST(request: NextRequest) {
             { status: 401 }
           );
         }
-
         user = await findUserById(decoded.userId);
-        if (!user) {
-          return NextResponse.json(
-            { error: 'ユーザーが見つかりません' },
-            { status: 404 }
-          );
-        }
       }
 
-      // Check subscription (無料プランでも使用可能、制限付き)
-      // 無料プランは1日3回まで、有料プランは制限に応じて使用可能
-      const planType = user.subscriptionType || 'free';
-      const isPaidPlan = user.isSubscribed || (planType !== 'free');
-      
-      // 有料プランで期限切れの場合のみエラー
-      if (isPaidPlan && !checkSubscription(user)) {
+      if (!user) {
         return NextResponse.json(
-          { error: 'サブスクリプションの有効期限が切れています。更新してください。' },
+          { error: 'ユーザーが見つかりません' },
+          { status: 404 }
+        );
+      }
+
+      if (!checkSubscription(user)) {
+        return NextResponse.json(
+          { error: '有効なサブスクリプションが必要です。' },
           { status: 403 }
         );
       }
 
-      // Check daily usage limit (1日50回まで - Groq API制限を考慮)
-      // AI生成前に使用回数をチェック（確実に制限を適用）
       const usageCheck = await canUseService(user.id);
       if (!usageCheck.canUse) {
         const usageInfo = await getUsageInfo(user.id);
@@ -134,7 +96,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // レート制限をチェック（1分間に3回まで - Groq API制限を考慮）
       const rateLimit = checkRateLimit(user.id);
       if (!rateLimit.allowed) {
         const resetTime = new Date(rateLimit.resetAt).toISOString();
@@ -157,70 +118,42 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出（開発環境ではスキップ）
-      if (!isDevMode) {
-        const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
-        if (anomalyResult.isAnomalous) {
-          console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
-          return NextResponse.json(
-            { error: '異常なアクセスパターンが検出されました' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // 使用回数を事前にカウント（AI生成前に）
-      // 開発環境ではスキップ
-      if (!isDevMode) {
-        await incrementUsageCount(user.id);
-        
-        // ストリークを更新
-        const streakResult = await updateStreak(user.id);
-        
-        // 統計を記録（総使用回数、レベル、バッジ）
-        const usageResult = await recordUsage(user.id);
-        
-        // 新しいバッジがあればログに記録
-        const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
-        if (allNewBadges.length > 0) {
-          console.log(`User ${user.id} earned new badges:`, allNewBadges);
-        }
+      const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
+      if (anomalyResult.isAnomalous) {
+        console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
+        return NextResponse.json(
+          { error: '異常なアクセスパターンが検出されました' },
+          { status: 403 }
+        );
       }
     }
 
-    // リクエストボディを取得（署名検証のため、文字列として保持）
-    const rawBody = await request.text();
-    const body = JSON.parse(rawBody);
-
-    // リクエストの署名を検証（オプション）
-    // 開発環境ではスキップ
-    if (!isDevMode) {
-      const signature = request.headers.get('x-request-signature');
-      const timestamp = request.headers.get('x-request-timestamp');
-      const contentHash = request.headers.get('x-content-hash');
-
-      if (signature && timestamp) {
-        if (!verifyRequestSignature(rawBody, signature, timestamp)) {
-          console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
-          return NextResponse.json(
-            { error: 'リクエストの署名が無効です' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // リクエストの整合性をチェック（オプション）
-      if (contentHash) {
-        if (!verifyRequestIntegrity(rawBody, contentHash)) {
-          console.warn('リクエストの整合性チェックに失敗:', { contentHash });
-          return NextResponse.json(
-            { error: 'リクエストの整合性が確認できませんでした' },
-            { status: 403 }
-          );
-        }
-      }
+    const body = await request.json();
+    const { herMessage, conversationHistory, fullConversationText, profileContext, goal, tone } = generateSchema.parse(body);
+    
+    if (!isDevMode && user) {
+      await incrementUsageCount(user.id);
     }
-    const { herMessage, conversationHistory, fullConversationText, profileContext, goal } = generateSchema.parse(body);
+
+    // 類似の成功パターン（過去の高評価）を取得してプロンプトに注入
+    const successPatternsForPrompt = (!isDevMode && user)
+      ? (await findSimilarSuccessPatterns({
+          userId: user.id,
+          query: [
+            `相手: ${herMessage}`,
+            fullConversationText ? `会話: ${fullConversationText}` : null,
+            profileContext ? `前提: ${profileContext}` : null,
+            goal ? `ゴール: ${goal}` : null,
+            tone ? `トーン: ${tone}` : null,
+          ].filter(Boolean).join('\n'),
+          limit: 3,
+        })).map((p) => ({
+          taskText: p.taskText,
+          response: p.response,
+          reason: p.knowledge.reason ?? null,
+          tags: p.knowledge.tags ?? null,
+        }))
+      : [];
 
     // Generate AI response
     let result;
@@ -229,6 +162,7 @@ export async function POST(request: NextRequest) {
     let streakInfo = null;
     let newBadges: string[] = [];
     let userStats = null;
+    let responseId: string | null = null;
     
     try {
       // ゴールが指定されている場合はゴール駆動型のレスポンスを生成
@@ -239,6 +173,8 @@ export async function POST(request: NextRequest) {
           fullConversationText,
           profileContext,
           goal,
+          tone,
+          successPatterns: successPatternsForPrompt,
         });
         // 通常のレスポンス形式に変換（互換性のため）
         result = {
@@ -253,34 +189,64 @@ export async function POST(request: NextRequest) {
           conversationHistory,
           fullConversationText,
           profileContext,
+          tone,
+          successPatterns: successPatternsForPrompt,
         });
       }
 
+      if (!isDevMode && user) {
+        const providerInfo = getAiProviderInfo();
+        const history = await createResponseHistory({
+          userId: user.id,
+          herMessage,
+          response: result.response,
+          explanation: result.explanation,
+          alternatives: result.alternatives || [],
+          conversationHistory,
+          fullConversationText,
+          profileContext,
+          goal,
+          tone,
+          responseType: goalDrivenResult ? 'goal-driven' : 'standard',
+          aiProvider: providerInfo.provider,
+          aiModel: providerInfo.model,
+          metadata: goalDrivenResult ? {
+            analysis: goalDrivenResult.analysis,
+            strategy: goalDrivenResult.strategy,
+            nextSteps: goalDrivenResult.nextSteps,
+          } : {},
+        });
+        responseId = history?.id || null;
+      }
+
+      if (!isDevMode && user) {
+        const streakResult = await updateStreak(user.id);
+        const usageResult = await recordUsage(user.id);
+
+        const allNewBadges = [...streakResult.newBadges, ...usageResult.newBadges];
+        if (allNewBadges.length > 0) {
+          console.log(`User ${user.id} earned new badges:`, allNewBadges);
+        }
+      }
+
       // 使用回数情報・ストリーク・統計を取得（開発環境ではスキップ）
-      if (!isDevMode) {
-        const authHeader = request.headers.get('authorization');
-        if (authHeader?.startsWith('Bearer ')) {
-          const token = authHeader.substring(7);
-          const decoded = verifyToken(token);
-          if (decoded) {
-            const user = await findUserById(decoded.userId);
-            if (user) {
-              usageInfo = await getUsageInfo(user.id);
-              
-              // ストリーク情報
-              streakInfo = {
-                currentStreak: user.currentStreak || 0,
-                longestStreak: user.longestStreak || 0,
-              };
-              
-              // ユーザー統計
-              userStats = {
-                totalUsageCount: user.totalUsageCount || 0,
-                level: user.level || 1,
-                badges: user.badges || [],
-              };
-            }
-          }
+      if (!isDevMode && user) {
+        const refreshedUser = await findUserById(user.id);
+        if (refreshedUser) {
+          usageInfo = await getUsageInfo(refreshedUser.id);
+
+          // ストリーク情報
+          streakInfo = {
+            currentStreak: refreshedUser.currentStreak || 0,
+            longestStreak: refreshedUser.longestStreak || 0,
+          };
+
+          // ユーザー統計
+          userStats = {
+            totalUsageCount: refreshedUser.totalUsageCount || 0,
+            level: refreshedUser.level || 1,
+            badges: refreshedUser.badges || [],
+          };
         }
       }
     } catch (error) {
@@ -291,19 +257,9 @@ export async function POST(request: NextRequest) {
                                 error.message.includes('rate limit') ||
                                 error.message.includes('Rate limit'));
       
-      if (!isDevMode && !isRateLimitError) {
-        const authHeader = request.headers.get('authorization');
-        if (authHeader?.startsWith('Bearer ')) {
-          const token = authHeader.substring(7);
-          const decoded = verifyToken(token);
-          if (decoded) {
-            const user = await findUserById(decoded.userId);
-            if (user) {
-              // 使用回数を1減らす（ロールバック）
-              decrementUsageCount(user.id);
-            }
-          }
-        }
+      if (!isDevMode && !isRateLimitError && user) {
+        // 使用回数を1減らす（ロールバック）
+        await decrementUsageCount(user.id);
       }
       throw error;
     }
@@ -312,6 +268,7 @@ export async function POST(request: NextRequest) {
       response: result.response,
       explanation: result.explanation,
       alternatives: result.alternatives,
+      responseId: responseId ?? null,
       usageInfo, // 使用回数情報を返す
       streakInfo, // ストリーク情報を返す
       userStats, // ユーザー統計情報を返す
@@ -352,9 +309,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
-
-
-
-

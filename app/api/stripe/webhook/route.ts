@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStripe } from '@/lib/stripe';
 import { findUserByEmail, createUser, generateInitialPassword } from '@/lib/auth';
-import { updateUser } from '@/lib/supabase';
-import { grantReferralReward } from '@/lib/supabase';
+import { updateUser, grantReferralReward, recordStripeWebhookEvent, markStripeWebhookEventProcessed, markStripeWebhookEventFailed } from '@/lib/supabase';
 import { sendWelcomeEmail } from '@/lib/resend';
+import { notifyError } from '@/lib/slack';
 import Stripe from 'stripe';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -41,7 +41,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const record = await recordStripeWebhookEvent({
+    eventId: event.id,
+    eventType: event.type,
+    stripeCreatedAt: event.created ? new Date(event.created * 1000).toISOString() : undefined,
+  });
+
+  if (!record.created) {
+    console.log(`Duplicate webhook event ignored: ${event.id}`);
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
+    let handled = true;
     // イベントタイプに応じて処理
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -64,12 +76,16 @@ export async function POST(request: NextRequest) {
       }
 
       default:
+        handled = false;
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    await markStripeWebhookEventProcessed(event.id, handled ? 'processed' : 'ignored');
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook handler error:', error);
+    await markStripeWebhookEventFailed(event.id, error instanceof Error ? error.message : String(error));
+    await notifyError('/api/stripe/webhook', error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
@@ -176,8 +192,8 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return;
   }
 
-  // サブスクリプション状態を更新
-  const isActive = subscription.status === 'active';
+  // サブスクリプション状態を更新（active と trialing の両方を有効とする）
+  const isActive = subscription.status === 'active' || subscription.status === 'trialing';
   await updateUser(user.id, {
     is_subscribed: isActive,
     subscription_type: plan || 'monthly',

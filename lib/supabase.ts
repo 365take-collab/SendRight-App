@@ -33,7 +33,6 @@ export interface DbUser {
   password_hash: string | null;
   stripe_customer_id: string | null;
   is_subscribed: boolean;
-  is_utage_user: boolean;
   subscription_type: string;
   daily_usage_limit: number;
   current_streak: number;
@@ -164,6 +163,34 @@ export async function incrementUsageCount(userId: string): Promise<number> {
   }
 }
 
+export async function decrementUsageCount(userId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: existing } = await getSupabaseClient()
+    .from('usage_records')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .single();
+
+  if (!existing) {
+    return;
+  }
+
+  const newCount = Math.max(0, (existing.count || 0) - 1);
+  if (newCount === 0) {
+    await getSupabaseClient()
+      .from('usage_records')
+      .delete()
+      .eq('id', existing.id);
+  } else {
+    await getSupabaseClient()
+      .from('usage_records')
+      .update({ count: newCount })
+      .eq('id', existing.id);
+  }
+}
+
 export async function getUsageInfo(userId: string): Promise<{ todayCount: number; limit: number; remaining: number }> {
   const user = await findUserById(userId);
   const limit = user?.daily_usage_limit || 50;
@@ -213,6 +240,300 @@ export async function unbanUser(userId: string): Promise<void> {
     .from('ban_list')
     .delete()
     .eq('user_id', userId);
+}
+
+// ========================================
+// AI返信履歴関連
+// ========================================
+
+export interface DbResponseHistory {
+  id: string;
+  user_id: string;
+  her_message: string;
+  response: string;
+  explanation: string | null;
+  alternatives: any[] | null;
+  conversation_history: any[] | null;
+  full_conversation_text: string | null;
+  profile_context: string | null;
+  goal: string | null;
+  tone: string | null;
+  response_type: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  metadata: Record<string, any> | null;
+  created_at: string;
+}
+
+export async function createResponseHistory(input: {
+  userId: string;
+  herMessage: string;
+  response: string;
+  explanation?: string;
+  alternatives?: any[];
+  conversationHistory?: any[];
+  fullConversationText?: string;
+  profileContext?: string;
+  goal?: string;
+  tone?: string;
+  responseType?: string;
+  aiProvider?: string;
+  aiModel?: string;
+  metadata?: Record<string, any>;
+}): Promise<DbResponseHistory | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('response_histories')
+    .insert([{
+      user_id: input.userId,
+      her_message: input.herMessage,
+      response: input.response,
+      explanation: input.explanation || null,
+      alternatives: input.alternatives || [],
+      conversation_history: input.conversationHistory || null,
+      full_conversation_text: input.fullConversationText || null,
+      profile_context: input.profileContext || null,
+      goal: input.goal || null,
+      tone: input.tone || null,
+      response_type: input.responseType || null,
+      ai_provider: input.aiProvider || null,
+      ai_model: input.aiModel || null,
+      metadata: input.metadata || {},
+    }])
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error('Error creating response history:', error);
+    return null;
+  }
+  return data as DbResponseHistory;
+}
+
+export async function listResponseHistories(input: {
+  userId: string;
+  limit?: number;
+  before?: string;
+}): Promise<DbResponseHistory[]> {
+  let query = getSupabaseClient()
+    .from('response_histories')
+    .select('*')
+    .eq('user_id', input.userId)
+    .order('created_at', { ascending: false })
+    .limit(input.limit || 20);
+
+  if (input.before) {
+    query = query.lt('created_at', input.before);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) {
+    console.error('Error listing response histories:', error);
+    return [];
+  }
+  return data as DbResponseHistory[];
+}
+
+export async function findResponseHistoryById(
+  id: string,
+  userId: string
+): Promise<DbResponseHistory | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('response_histories')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+  return data as DbResponseHistory;
+}
+
+// ========================================
+// 返信フィードバック関連
+// ========================================
+
+export interface DbResponseFeedback {
+  id: string;
+  user_id: string;
+  response_id: string;
+  rating: string;
+  reason: string | null;
+  tags: string[] | null;
+  goal_achieved: boolean | null;
+  created_at: string;
+}
+
+export async function createResponseFeedback(input: {
+  userId: string;
+  responseId: string;
+  rating: string;
+  reason?: string;
+  tags?: string[];
+  goalAchieved?: boolean;
+}): Promise<DbResponseFeedback | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('response_feedback')
+    .insert([{
+      user_id: input.userId,
+      response_id: input.responseId,
+      rating: input.rating,
+      reason: input.reason || null,
+      tags: input.tags || null,
+      goal_achieved: typeof input.goalAchieved === 'boolean' ? input.goalAchieved : null,
+    }])
+    .select()
+    .single();
+
+  if (error || !data) {
+    if (error?.code === '23505') {
+      return null;
+    }
+    console.error('Error creating response feedback:', error);
+    return null;
+  }
+  return data as DbResponseFeedback;
+}
+
+export async function findResponseFeedback(
+  responseId: string,
+  userId: string
+): Promise<DbResponseFeedback | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('response_feedback')
+    .select('*')
+    .eq('response_id', responseId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+  return data as DbResponseFeedback;
+}
+
+// ========================================
+// 成功パターンDB（高評価セッションのナレッジ化）
+// ========================================
+
+export interface DbSuccessPattern {
+  id: string;
+  user_id: string;
+  response_id: string;
+  task_text: string;
+  her_message: string;
+  response: string;
+  knowledge: Record<string, any> | null;
+  created_at: string;
+}
+
+export async function createSuccessPattern(input: {
+  userId: string;
+  responseId: string;
+  taskText: string;
+  herMessage: string;
+  response: string;
+  knowledge: Record<string, any>;
+}): Promise<DbSuccessPattern | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('success_patterns')
+    .insert([{
+      user_id: input.userId,
+      response_id: input.responseId,
+      task_text: input.taskText,
+      her_message: input.herMessage,
+      response: input.response,
+      knowledge: input.knowledge,
+    }])
+    .select()
+    .single();
+
+  if (error || !data) {
+    // Duplicate (user_id, response_id) -> ignore
+    if (error?.code === '23505') return null;
+    console.error('Error creating success pattern:', error);
+    return null;
+  }
+  return data as DbSuccessPattern;
+}
+
+export async function listSuccessPatternsForUser(input: {
+  userId: string;
+  limit?: number;
+}): Promise<DbSuccessPattern[]> {
+  const { data, error } = await getSupabaseClient()
+    .from('success_patterns')
+    .select('*')
+    .eq('user_id', input.userId)
+    .order('created_at', { ascending: false })
+    .limit(input.limit || 50);
+
+  if (error || !data) {
+    console.error('Error listing success patterns:', error);
+    return [];
+  }
+  return data as DbSuccessPattern[];
+}
+
+// ========================================
+// Stripe webhook冪等性
+// ========================================
+
+export async function recordStripeWebhookEvent(input: {
+  eventId: string;
+  eventType: string;
+  stripeCreatedAt?: string;
+}): Promise<{ created: boolean }> {
+  const { error } = await getSupabaseClient()
+    .from('stripe_webhook_events')
+    .insert([{
+      event_id: input.eventId,
+      event_type: input.eventType,
+      stripe_created_at: input.stripeCreatedAt || null,
+      status: 'processing',
+    }]);
+
+  if (error) {
+    if (error.code === '23505') {
+      return { created: false };
+    }
+    console.error('Error recording stripe webhook event:', error);
+    throw error;
+  }
+
+  return { created: true };
+}
+
+export async function markStripeWebhookEventProcessed(eventId: string, status: 'processed' | 'ignored' = 'processed') {
+  const { error } = await getSupabaseClient()
+    .from('stripe_webhook_events')
+    .update({
+      status,
+      processed_at: new Date().toISOString(),
+      last_error: null,
+    })
+    .eq('event_id', eventId);
+
+  if (error) {
+    console.error('Error updating stripe webhook event:', error);
+  }
+}
+
+export async function markStripeWebhookEventFailed(eventId: string, errorMessage: string) {
+  const trimmedError = errorMessage.length > 1000 ? `${errorMessage.slice(0, 1000)}...` : errorMessage;
+  const { error } = await getSupabaseClient()
+    .from('stripe_webhook_events')
+    .update({
+      status: 'failed',
+      processed_at: new Date().toISOString(),
+      last_error: trimmedError,
+    })
+    .eq('event_id', eventId);
+
+  if (error) {
+    console.error('Error updating stripe webhook event failure:', error);
+  }
 }
 
 // ========================================

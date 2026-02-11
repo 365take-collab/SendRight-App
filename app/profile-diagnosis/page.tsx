@@ -103,8 +103,8 @@ export default function ProfileDiagnosisPage() {
   useEffect(() => {
     // 認証チェック（簡易版）
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-    const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
-
+    const hasToken = !!localStorage.getItem('token') || !!localStorage.getItem('sendright_user');
+    
     if (isDevMode || hasToken) {
       setIsAuthenticated(true);
     } else {

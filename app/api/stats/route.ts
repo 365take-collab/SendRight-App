@@ -1,31 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, getUserStats, recordSuccess, BADGES } from '@/lib/auth';
 
+async function getUserFromAuthHeader(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+
+  if (token.startsWith('email-')) {
+    const userId = token.substring(6);
+    return await findUserById(userId);
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) return null;
+  return await findUserById(decoded.userId);
+}
+
 // ユーザー統計情報を取得
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const user = await getUserFromAuthHeader(request);
+    if (!user) {
       return NextResponse.json(
         { error: '認証が必要です' },
         { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: '無効なトークンです' },
-        { status: 401 }
-      );
-    }
-
-    const user = await findUserById(decoded.userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 }
       );
     }
 
@@ -59,28 +57,11 @@ export async function GET(request: NextRequest) {
 // 成功を記録（ユーザーが「良かった」評価をした時）
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const user = await getUserFromAuthHeader(request);
+    if (!user) {
       return NextResponse.json(
         { error: '認証が必要です' },
         { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: '無効なトークンです' },
-        { status: 401 }
-      );
-    }
-
-    const user = await findUserById(decoded.userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 }
       );
     }
 

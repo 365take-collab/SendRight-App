@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStripe } from '@/lib/stripe';
+import { getStripeBaseUrl } from '@/lib/stripe-config';
 import { verifyToken, findUserById } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = requireStripe();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
+    const baseUrl = getStripeBaseUrl(request);
 
     // Customer Portal Sessionを作成
     const session = await stripe.billingPortal.sessions.create({

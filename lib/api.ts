@@ -100,6 +100,18 @@ export interface Badge {
   description: string;
 }
 
+// 返信トーン（プリセット）
+export const TONE_PRESETS = [
+  { id: 'default', label: '標準' },
+  { id: 'casual', label: 'カジュアル' },
+  { id: 'gentle', label: 'やさしい' },
+  { id: 'direct', label: 'ストレート' },
+  { id: 'playful', label: '軽いノリ' },
+  { id: 'polite', label: '丁寧' },
+] as const;
+
+export type TonePreset = typeof TONE_PRESETS[number]['id'];
+
 // ゴール選択肢
 export const GOALS = [
   { id: 'date', label: 'デートに誘いたい', icon: '🍽️' },
@@ -137,6 +149,7 @@ export interface AIResponse {
   response: string;
   explanation: string;
   alternatives?: AlternativeResponse[]; // 代替返信候補（それぞれに解説付き）
+  responseId?: string | null; // 返信履歴ID
   usageInfo?: UsageInfo; // 使用回数情報
   streakInfo?: StreakInfo; // ストリーク情報
   userStats?: Partial<UserStats>; // ユーザー統計情報
@@ -150,7 +163,8 @@ export async function generateAIResponse(
   _tone?: 'casual' | 'friendly' | 'romantic' | 'playful', // 未使用（後方互換性のため残す）
   fullConversationText?: string, // 画像から抽出した会話全体のテキスト
   profileContext?: string, // 前提情報（名前、年齢、関係性など）
-  goal?: GoalId // ゴール（デートに誘いたい、LINE交換したい、など）
+  goal?: GoalId, // ゴール（デートに誘いたい、LINE交換したい、など）
+  tone?: TonePreset // 返信トーン
 ): Promise<AIResponse> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -164,7 +178,7 @@ export async function generateAIResponse(
   const response = await fetch('/api/generate-response', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ herMessage, conversationHistory, fullConversationText, profileContext, goal }),
+    body: JSON.stringify({ herMessage, conversationHistory, fullConversationText, profileContext, goal, tone }),
   });
 
   if (!response.ok) {
@@ -177,9 +191,65 @@ export async function generateAIResponse(
     response: data.response,
     explanation: data.explanation || '',
     alternatives: data.alternatives || [],
+    responseId: data.responseId ?? null,
     usageInfo: data.usageInfo, // 使用回数情報を追加
     goalDriven: data.goalDriven || null, // ゴール駆動型の追加情報
   };
+}
+
+export async function listResponseHistory(
+  token: string,
+  options?: { limit?: number; before?: string }
+): Promise<{ responses: any[] }> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true') {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const params = new URLSearchParams();
+  if (options?.limit) params.set('limit', options.limit.toString());
+  if (options?.before) params.set('before', options.before);
+
+  const response = await fetch(`/api/responses?${params.toString()}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || '返信履歴の取得に失敗しました');
+  }
+
+  return response.json();
+}
+
+export async function submitResponseFeedback(
+  token: string,
+  input: { responseId: string; rating: 'good' | 'bad'; reason?: string; tags?: string[]; goalAchieved?: boolean }
+): Promise<{ success: boolean }> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true') {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch('/api/responses/feedback', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'フィードバックの送信に失敗しました');
+  }
+
+  return response.json();
 }
 
 export async function subscribe(token: string, plan: 'monthly' | 'yearly'): Promise<{ url: string }> {
@@ -376,7 +446,6 @@ export async function recordSuccess(token: string): Promise<{
 
   return response.json();
 }
-
 
 
 

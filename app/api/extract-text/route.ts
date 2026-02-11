@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo } from '@/lib/auth';
-import { findUserById as findUserByIdFromSupabase } from '@/lib/supabase';
-import { checkRateLimit, verifyRequestSignature, verifyRequestIntegrity, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
+import { checkRateLimit, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
 import OpenAI from 'openai';
 import { z } from 'zod';
 
@@ -28,11 +27,9 @@ export async function POST(request: NextRequest) {
                       request.nextUrl.hostname === 'localhost' ||
                       request.nextUrl.hostname.includes('ngrok');
 
-    // 認証チェック（開発環境ではスキップ）
-    // 注意: refererやIPチェックは削除。認証トークンがあれば十分。
-    // メールからのログインユーザーも使えるようにする。
+    let user: Awaited<ReturnType<typeof findUserById>> | null = null;
+
     if (!isDevMode) {
-      // Check authentication
       const authHeader = request.headers.get('authorization');
       if (!authHeader?.startsWith('Bearer ')) {
         return NextResponse.json(
@@ -42,37 +39,9 @@ export async function POST(request: NextRequest) {
       }
 
       const token = authHeader.substring(7);
-
-      // メール登録ユーザー用トークン（email-{userId}形式）
-      const isEmailToken = token.startsWith('email-');
-
-      let user = null;
-
-      if (isEmailToken) {
-        // メール登録ユーザー: Supabaseから直接ユーザーを取得
-        const userId = token.substring(6); // 'email-' を除去
-        const dbUser = await findUserByIdFromSupabase(userId);
-        if (!dbUser) {
-          return NextResponse.json(
-            { error: 'ユーザーが見つかりません', extractedText: '', message: '' },
-            { status: 404 }
-          );
-        }
-        // DbUser型をUser型に変換
-        user = {
-          id: dbUser.id,
-          email: dbUser.email,
-          isSubscribed: dbUser.is_subscribed,
-          subscriptionType: (dbUser.subscription_type || 'free') as 'free' | 'monthly' | 'yearly',
-          dailyUsageLimit: dbUser.daily_usage_limit,
-          currentStreak: dbUser.current_streak,
-          longestStreak: dbUser.longest_streak,
-          badges: dbUser.badges || [],
-          totalUsageCount: dbUser.total_usage_count,
-          successCount: dbUser.success_count,
-          level: dbUser.level,
-          createdAt: new Date(dbUser.created_at),
-        };
+      if (token.startsWith('email-')) {
+        const userId = token.substring(6);
+        user = await findUserById(userId);
       } else {
         const decoded = verifyToken(token);
         if (!decoded) {
@@ -81,17 +50,16 @@ export async function POST(request: NextRequest) {
             { status: 401 }
           );
         }
-
         user = await findUserById(decoded.userId);
-        if (!user) {
-          return NextResponse.json(
-            { error: 'ユーザーが見つかりません' },
-            { status: 404 }
-          );
-        }
       }
 
-      // Check subscription
+      if (!user) {
+        return NextResponse.json(
+          { error: 'ユーザーが見つかりません', extractedText: '', message: '' },
+          { status: 404 }
+        );
+      }
+
       const hasActiveSubscription = checkSubscription(user);
       if (!hasActiveSubscription) {
         return NextResponse.json(
@@ -100,8 +68,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check daily usage limit (1日50回まで - Groq API制限を考慮)
-      // 画像抽出も使用回数にカウント
       const usageCheck = await canUseService(user.id);
       if (!usageCheck.canUse) {
         const usageInfo = await getUsageInfo(user.id);
@@ -116,7 +82,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // レート制限をチェック（1分間に3回まで - Groq API制限を考慮）
       const rateLimit = checkRateLimit(user.id);
       if (!rateLimit.allowed) {
         const resetTime = new Date(rateLimit.resetAt).toISOString();
@@ -141,51 +106,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 異常なアクセスパターンを検出（開発環境ではスキップ）
-      if (!isDevMode) {
-        const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
-        if (anomalyResult.isAnomalous) {
-          console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
-          return NextResponse.json(
-            { error: '異常なアクセスパターンが検出されました', extractedText: '', message: '' },
-            { status: 403 }
-          );
-        }
+      const anomalyResult = detectAnomalousPattern(user.id, request.nextUrl.pathname, Date.now());
+      if (anomalyResult.isAnomalous) {
+        console.warn('異常なアクセスパターンを検出:', { userId: user.id, path: request.nextUrl.pathname, reason: anomalyResult.reason });
+        return NextResponse.json(
+          { error: '異常なアクセスパターンが検出されました', extractedText: '', message: '' },
+          { status: 403 }
+        );
       }
     }
 
-    // リクエストボディを取得（署名検証のため、文字列として保持）
-    const rawBody = await request.text();
-    const body = JSON.parse(rawBody);
-
-    // リクエストの署名を検証（オプション）
-    // 開発環境ではスキップ
-    if (!isDevMode) {
-      const signature = request.headers.get('x-request-signature');
-      const timestamp = request.headers.get('x-request-timestamp');
-      const contentHash = request.headers.get('x-content-hash');
-
-      if (signature && timestamp) {
-        if (!verifyRequestSignature(rawBody, signature, timestamp)) {
-          console.warn('リクエストの署名検証に失敗:', { signature, timestamp });
-          return NextResponse.json(
-            { error: 'リクエストの署名が無効です', extractedText: '', message: '' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // リクエストの整合性をチェック（オプション）
-      if (contentHash) {
-        if (!verifyRequestIntegrity(rawBody, contentHash)) {
-          console.warn('リクエストの整合性チェックに失敗:', { contentHash });
-          return NextResponse.json(
-            { error: 'リクエストの整合性が確認できませんでした', extractedText: '', message: '' },
-            { status: 403 }
-          );
-        }
-      }
-    }
+    const body = await request.json();
     // Validate request body
     const { image } = extractSchema.parse(body);
 
@@ -562,19 +493,9 @@ LINEやマッチングアプリでは：
 
     // 使用回数を増やす（開発環境ではスキップ）
     let usageInfo = null;
-    if (!isDevMode) {
-      const authHeader = request.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        const decoded = verifyToken(token);
-        if (decoded) {
-          const user = await findUserById(decoded.userId);
-          if (user) {
-            await incrementUsageCount(user.id);
-            usageInfo = await getUsageInfo(user.id);
-          }
-        }
-      }
+    if (!isDevMode && user) {
+      await incrementUsageCount(user.id);
+      usageInfo = await getUsageInfo(user.id);
     }
 
     return NextResponse.json({
@@ -618,4 +539,3 @@ LINEやマッチングアプリでは：
     );
   }
 }
-

@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStripe } from '@/lib/stripe';
+import { getStripeBaseUrl, getStripePriceId } from '@/lib/stripe-config';
 import { verifyToken, findUserById } from '@/lib/auth';
 import { z } from 'zod';
+
+export const runtime = 'nodejs';
 
 const checkoutSchema = z.object({
   plan: z.enum(['monthly', 'yearly']),
 });
-
-// Stripe Price IDs（環境変数から取得）
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
-const isTestMode = STRIPE_SECRET_KEY.startsWith('sk_test_');
-
-const STRIPE_PRICE_MONTHLY = isTestMode 
-  ? (process.env.STRIPE_PRICE_MONTHLY_TEST || process.env.STRIPE_PRICE_MONTHLY || 'price_1ShWEK3F2rtCunnnqVQRiLAd')
-  : (process.env.STRIPE_PRICE_MONTHLY || 'price_1ShWEK3F2rtCunnnqVQRiLAd');
-
-const STRIPE_PRICE_YEARLY = isTestMode
-  ? (process.env.STRIPE_PRICE_YEARLY_TEST || process.env.STRIPE_PRICE_YEARLY || 'price_1ShWEk3F2rtCunnnkSn8wg2I')
-  : (process.env.STRIPE_PRICE_YEARLY || 'price_1ShWEk3F2rtCunnnkSn8wg2I');
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +19,7 @@ export async function POST(request: NextRequest) {
     const stripe = requireStripe();
 
     // Price IDを選択
-    const priceId = plan === 'monthly' ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
+    const priceId = getStripePriceId(plan);
 
     // 認証チェック（オプション）
     const authHeader = request.headers.get('authorization');
@@ -49,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Checkout Sessionを作成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.sendright.jp';
+    const baseUrl = getStripeBaseUrl(request);
     
     // Checkout Session作成
     const sessionOptions: any = {

@@ -11,9 +11,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password } = loginSchema.parse(body);
+    const normalizedEmail = email.toLowerCase().trim();
 
     // ユーザーを検索
-    const user = await findUserByEmail(email);
+    const user = await findUserByEmail(normalizedEmail);
     if (!user) {
       return NextResponse.json(
         { error: 'メールアドレスまたはパスワードが正しくありません' },

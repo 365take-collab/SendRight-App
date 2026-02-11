@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,
   stripe_customer_id TEXT,
   is_subscribed BOOLEAN DEFAULT false,
-  is_utage_user BOOLEAN DEFAULT false,
+  is_utage_user BOOLEAN DEFAULT false, -- legacy: Utage解約済み（互換維持）
   subscription_type TEXT DEFAULT 'free',
   daily_usage_limit INTEGER DEFAULT 3,
   current_streak INTEGER DEFAULT 0,
@@ -135,3 +135,119 @@ EXECUTE FUNCTION auto_generate_referral_code();
 -- SELECT * FROM users LIMIT 5;
 -- SELECT * FROM sendright_referral_settings;
 -- SELECT * FROM sendright_referrals LIMIT 5;
+
+-- ============================================
+-- AI返信履歴・フィードバック
+-- ============================================
+CREATE TABLE IF NOT EXISTS response_histories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  her_message TEXT NOT NULL,
+  response TEXT NOT NULL,
+  explanation TEXT,
+  alternatives JSONB DEFAULT '[]',
+  conversation_history JSONB,
+  full_conversation_text TEXT,
+  profile_context TEXT,
+  goal TEXT,
+  tone TEXT,
+  response_type TEXT,
+  ai_provider TEXT,
+  ai_model TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_histories_user_id ON response_histories(user_id);
+CREATE INDEX IF NOT EXISTS idx_response_histories_created_at ON response_histories(created_at);
+
+CREATE TABLE IF NOT EXISTS response_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  response_id UUID REFERENCES response_histories(id) ON DELETE CASCADE,
+  rating TEXT NOT NULL,
+  reason TEXT,
+  tags TEXT[],
+  goal_achieved BOOLEAN,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_feedback_user_id ON response_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_response_feedback_response_id ON response_feedback(response_id);
+
+-- ============================================
+-- Success Pattern DB（高評価セッションのナレッジ化）
+-- ============================================
+CREATE TABLE IF NOT EXISTS success_patterns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  response_id UUID REFERENCES response_histories(id) ON DELETE CASCADE,
+  task_text TEXT NOT NULL,
+  her_message TEXT NOT NULL,
+  response TEXT NOT NULL,
+  knowledge JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_success_patterns_user_response_unique
+ON success_patterns(user_id, response_id);
+
+CREATE INDEX IF NOT EXISTS idx_success_patterns_user_id ON success_patterns(user_id);
+CREATE INDEX IF NOT EXISTS idx_success_patterns_created_at ON success_patterns(created_at);
+
+-- ============================================
+-- Stripe webhook冪等性
+-- ============================================
+CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT UNIQUE NOT NULL,
+  event_type TEXT NOT NULL,
+  stripe_created_at TIMESTAMPTZ,
+  status TEXT DEFAULT 'processing', -- processing, processed, ignored, failed
+  last_error TEXT,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_event_id ON stripe_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_status ON stripe_webhook_events(status);
+
+-- ============================================
+-- ステップメール用スキーマ
+-- ============================================
+CREATE TABLE IF NOT EXISTS email_schedules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  email_type TEXT NOT NULL,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  sent_at TIMESTAMPTZ,
+  status TEXT DEFAULT 'pending', -- 'pending', 'processing', 'sent', 'failed', 'cancelled'
+  send_attempts INTEGER DEFAULT 0,
+  last_error TEXT,
+  processing_started_at TIMESTAMPTZ,
+  processing_id TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_schedules_user_id ON email_schedules(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_schedules_email ON email_schedules(email);
+CREATE INDEX IF NOT EXISTS idx_email_schedules_status ON email_schedules(status);
+CREATE INDEX IF NOT EXISTS idx_email_schedules_scheduled_at ON email_schedules(scheduled_at);
+
+CREATE TABLE IF NOT EXISTS email_sent_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  email_type TEXT NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_sent_history_user_id ON email_sent_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_sent_history_email_type ON email_sent_history(email_type);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_sent_history_unique
+ON email_sent_history(user_id, email_type);

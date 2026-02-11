@@ -113,12 +113,18 @@ export default function LandingPage() {
 
           {/* VSL動画エリア */}
           <div className="relative max-w-2xl mx-auto mb-8">
-            <div 
-              className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl cursor-pointer group"
+            <div
+              className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden shadow-2xl cursor-pointer group"
               onClick={() => setShowVSLModal(true)}
             >
-              {/* サムネイル or プレビュー動画 */}
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-coral-500/20" />
+              {/* サムネイル画像 */}
+              <Image
+                src="/images/mockups/sendright-ui.png"
+                alt="SendRight UI"
+                fill
+                className="object-contain p-4"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-coral-500/10" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
                   <Play className="w-8 h-8 text-pink-500 ml-1" />
@@ -128,10 +134,6 @@ export default function LandingPage() {
                 <p className="text-white text-sm font-medium bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 inline-block">
                   🎬 3分で分かる SendRight（音声あり）
                 </p>
-              </div>
-              {/* プレビュー用の静止画やGIF */}
-              <div className="absolute inset-0 flex items-center justify-center text-white/50 text-6xl">
-                📱💬
               </div>
             </div>
           </div>
