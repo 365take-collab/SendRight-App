@@ -5,9 +5,39 @@ import {
   getReferralHistory,
   generateReferralLink,
 } from '@/lib/supabase';
+import { verifyToken, findUserById } from '@/lib/auth';
+
+async function authenticateRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+  }
+
+  const token = authHeader.substring(7);
+  if (token.startsWith('email-')) {
+    return NextResponse.json({ error: '無効なトークンです' }, { status: 401 });
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return NextResponse.json({ error: '無効なトークンです' }, { status: 401 });
+  }
+
+  const user = await findUserById(decoded.userId);
+  if (!user) {
+    return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
+  }
+
+  return user;
+}
 
 // GET: 紹介コード・リンク・履歴を取得
 export async function GET(request: NextRequest) {
+  const authenticated = await authenticateRequest(request);
+  if (authenticated instanceof NextResponse) {
+    return authenticated;
+  }
+
   const email = request.nextUrl.searchParams.get('email');
 
   if (!email) {
@@ -47,6 +77,11 @@ export async function GET(request: NextRequest) {
 
 // POST: 紹介コードを検証
 export async function POST(request: NextRequest) {
+  const authenticated = await authenticateRequest(request);
+  if (authenticated instanceof NextResponse) {
+    return authenticated;
+  }
+
   try {
     const { referralCode } = await request.json();
 

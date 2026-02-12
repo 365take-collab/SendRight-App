@@ -75,17 +75,8 @@ export async function POST(req: NextRequest) {
     const existingUser = await findUserByEmail(normalizedEmail);
 
     if (existingUser) {
-      // 既存ユーザーの場合、使用回数情報を返す
       return NextResponse.json({
-        success: true,
-        isNew: false,
-        user: {
-          id: existingUser.id,
-          email: existingUser.email,
-          isSubscribed: existingUser.is_subscribed,
-          dailyUsageLimit: existingUser.daily_usage_limit,
-        },
-        message: 'おかえりなさい！',
+        message: '既にメールが登録されています',
       });
     }
 

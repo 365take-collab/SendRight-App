@@ -40,18 +40,21 @@ export async function POST(request: NextRequest) {
 
       const token = authHeader.substring(7);
       if (token.startsWith('email-')) {
-        const userId = token.substring(6);
-        user = await findUserById(userId);
-      } else {
-        const decoded = verifyToken(token);
-        if (!decoded) {
-          return NextResponse.json(
-            { error: '無効なトークンです' },
-            { status: 401 }
-          );
-        }
-        user = await findUserById(decoded.userId);
+        return NextResponse.json(
+          { error: '無効なトークンです' },
+          { status: 401 }
+        );
       }
+
+      const decoded = verifyToken(token);
+      if (!decoded) {
+        return NextResponse.json(
+          { error: '無効なトークンです' },
+          { status: 401 }
+        );
+      }
+
+      user = await findUserById(decoded.userId);
 
       if (!user) {
         return NextResponse.json(
@@ -257,7 +260,7 @@ LINEやマッチングアプリでは：
     });
 
     const extractedText = response.choices[0]?.message?.content || '';
-    console.log('OpenAI抽出結果:', extractedText);
+    console.log('OpenAI抽出結果を受信', { textLength: extractedText.length });
 
     // エラーメッセージのチェック（より柔軟に）
     const errorKeywords = [
@@ -417,7 +420,6 @@ LINEやマッチングアプリでは：
     
     // 最終チェック: 抽出されたメッセージがUI要素でないか確認
     if (message && isUIElement(message)) {
-      console.log('UI要素として検出されたため、メッセージを除外:', message);
       message = '';
     }
     

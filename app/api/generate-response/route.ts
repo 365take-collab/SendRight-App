@@ -57,18 +57,21 @@ export async function POST(request: NextRequest) {
       const token = authHeader.substring(7);
 
       if (token.startsWith('email-')) {
-        const userId = token.substring(6);
-        user = await findUserById(userId);
-      } else {
-        const decoded = verifyToken(token);
-        if (!decoded) {
-          return NextResponse.json(
-            { error: '無効なトークンです' },
-            { status: 401 }
-          );
-        }
-        user = await findUserById(decoded.userId);
+        return NextResponse.json(
+          { error: '無効なトークンです' },
+          { status: 401 }
+        );
       }
+
+      const decoded = verifyToken(token);
+      if (!decoded) {
+        return NextResponse.json(
+          { error: '無効なトークンです' },
+          { status: 401 }
+        );
+      }
+
+      user = await findUserById(decoded.userId);
 
       if (!user) {
         return NextResponse.json(
