@@ -1,5 +1,3 @@
-import crypto from 'crypto';
-
 // レート制限の記録（メモリベース、本番環境ではRedisなどを推奨）
 interface RateLimitRecord {
   userId: string;
@@ -25,25 +23,8 @@ const accessRecords: Map<string, AccessRecord[]> = new Map();
 export const RATE_LIMIT_WINDOW = 60 * 1000; // 1分
 export const RATE_LIMIT_MAX_REQUESTS = 3; // 1分間に3回まで（Groq API制限を考慮）
 
-// リクエスト署名検証用のシークレット
-const REQUEST_SIGNATURE_SECRET = (() => {
-  if (process.env.REQUEST_SIGNATURE_SECRET) {
-    return process.env.REQUEST_SIGNATURE_SECRET;
-  }
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('REQUEST_SIGNATURE_SECRET is required in production');
-  }
-  return 'dev-only-secret';
-})();
-
-function safeTimingEqual(a: string, b: string): boolean {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  if (aBuffer.length !== bBuffer.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(aBuffer, bBuffer);
-}
+// NOTE: Node.js crypto依存の関数（verifyRequestSignature, verifyRequestIntegrity）は
+// 削除済み。このファイルはEdge Runtime互換を維持すること。
 
 /**
  * レート制限をチェック
@@ -87,59 +68,6 @@ export function checkRateLimit(userId: string): { allowed: boolean; remaining: n
     remaining: RATE_LIMIT_MAX_REQUESTS - record.count,
     resetAt: record.resetAt,
   };
-}
-
-/**
- * リクエストの署名を検証
- * @param body リクエストボディ
- * @param signature 署名
- * @param timestamp タイムスタンプ
- * @returns 署名が有効な場合はtrue
- */
-export function verifyRequestSignature(
-  body: string,
-  signature: string,
-  timestamp: string
-): boolean {
-  if (!signature || !timestamp) {
-    return false;
-  }
-
-  // タイムスタンプの有効期限をチェック（5分以内）
-  const requestTime = parseInt(timestamp, 10);
-  const now = Date.now();
-  const timeDiff = Math.abs(now - requestTime);
-  const maxTimeDiff = 5 * 60 * 1000; // 5分
-
-  if (timeDiff > maxTimeDiff) {
-    console.warn('リクエストのタイムスタンプが無効:', { requestTime, now, timeDiff });
-    return false;
-  }
-
-  // 署名を生成
-  const expectedSignature = crypto
-    .createHmac('sha256', REQUEST_SIGNATURE_SECRET)
-    .update(`${timestamp}:${body}`)
-    .digest('hex');
-
-  // 署名を比較（タイミング攻撃を防ぐため、定数時間比較を使用）
-  return safeTimingEqual(signature, expectedSignature);
-}
-
-/**
- * リクエストの整合性をチェック
- * @param body リクエストボディ
- * @param contentHash コンテンツハッシュ
- * @returns 整合性が取れている場合はtrue
- */
-export function verifyRequestIntegrity(body: string, contentHash?: string): boolean {
-  if (!contentHash) {
-    // コンテンツハッシュが提供されていない場合は、整合性チェックをスキップ（後方互換性のため）
-    return true;
-  }
-
-  const expectedHash = crypto.createHash('sha256').update(body).digest('hex');
-  return safeTimingEqual(contentHash, expectedHash);
 }
 
 /**
