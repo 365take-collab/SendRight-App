@@ -206,7 +206,7 @@ export async function middleware(request: NextRequest) {
   }
   
   // それ以外の保護されたページ（/helpなど）
-  const protectedPaths = ['/help'];
+  const protectedPaths = ['/help', '/mypage'];
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname === path);
   
   // 保護されたページへのアクセスにはトークンが必要

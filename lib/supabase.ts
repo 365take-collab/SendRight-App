@@ -23,6 +23,10 @@ export function getSupabaseClient(): SupabaseClient {
   return supabase;
 }
 
+export const supabaseAdmin = {
+  from: (...args: Parameters<SupabaseClient['from']>) => getSupabaseClient().from(...args),
+};
+
 // ========================================
 // 型定義
 // ========================================
@@ -32,6 +36,7 @@ export interface DbUser {
   email: string;
   password_hash: string | null;
   stripe_customer_id: string | null;
+  referral_code: string | null;
   is_subscribed: boolean;
   subscription_type: string;
   daily_usage_limit: number;

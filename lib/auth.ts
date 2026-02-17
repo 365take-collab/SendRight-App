@@ -26,6 +26,7 @@ export interface User {
   stripeCustomerId?: string;
   dailyUsageLimit: number;
   subscriptionType?: 'free' | 'basic' | 'pro' | 'premium' | 'monthly' | 'yearly';
+  referralCode?: string;
   currentStreak: number;
   longestStreak: number;
   lastActiveDate?: string;
@@ -117,6 +118,7 @@ function dbUserToUser(dbUser: db.DbUser): User {
     stripeCustomerId: dbUser.stripe_customer_id || undefined,
     dailyUsageLimit: dbUser.daily_usage_limit,
     subscriptionType: dbUser.subscription_type as User['subscriptionType'],
+    referralCode: dbUser.referral_code || undefined,
     currentStreak: dbUser.current_streak,
     longestStreak: dbUser.longest_streak,
     lastActiveDate: dbUser.last_active_date || undefined,

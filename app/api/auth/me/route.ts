@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
         email: user.email,
         isSubscribed: hasActiveSubscription,
         subscriptionExpiresAt: user.subscriptionExpiresAt,
+        subscriptionType: user.subscriptionType,
+        referralCode: user.referralCode,
       },
     });
   } catch (error) {
@@ -45,7 +47,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
 
 
 
