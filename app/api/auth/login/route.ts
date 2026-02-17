@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // トークンを生成
     const token = generateToken(user.id);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       token,
       user: {
         id: user.id,
@@ -43,6 +43,25 @@ export async function POST(request: NextRequest) {
         subscriptionType: user.subscriptionType,
       },
     });
+
+    // middleware.ts の Cookie 認証で利用
+    const isProduction = process.env.NODE_ENV === 'production';
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+    response.cookies.set('userId', user.id, {
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     

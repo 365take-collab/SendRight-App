@@ -131,11 +131,15 @@ export default function MyPage() {
   };
 
   const handleLogout = () => {
+    // localStorageクリア
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('sendright_user');
     localStorage.removeItem('sendright_email');
     localStorage.removeItem('profileInfo');
+    // Cookieクリア（middleware.tsの認証用）
+    document.cookie = 'token=; path=/; max-age=0';
+    document.cookie = 'userId=; path=/; max-age=0';
     router.push('/');
   };
 

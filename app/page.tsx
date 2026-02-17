@@ -623,6 +623,14 @@ export default function Home() {
 
   // 初回ロード時にローカルストレージから復元
   useEffect(() => {
+    // パスワードログイン時のトークンから復元
+    const savedToken = localStorage.getItem('token');
+    if (savedToken && !user) {
+      setToken(savedToken);
+      loadUser(savedToken);
+      return;
+    }
+
     const savedEmail = localStorage.getItem('sendright_email');
     const savedUser = localStorage.getItem('sendright_user');
     if (savedEmail && savedUser) {
@@ -643,6 +651,7 @@ export default function Home() {
         console.error('Failed to restore user:', e);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ログインしていない場合、ログイン/登録ページを表示
