@@ -3,6 +3,18 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { sendStepEmail } from '@/lib/resend';
 import crypto from 'crypto';
 
+function normalizeHistoryEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function createEmailHistoryKey(email: string, emailType: string): string {
+  return `email:${normalizeHistoryEmail(email)}:${emailType}`;
+}
+
+function createUserHistoryKey(userId: string | null, emailType: string): string | null {
+  return userId ? `user:${userId}:${emailType}` : null;
+}
+
 // Vercel Cron Job用のエンドポイント
 // 毎日1回実行される想定
 export async function GET(request: NextRequest) {
@@ -74,6 +86,7 @@ export async function GET(request: NextRequest) {
       failed: 0,
       skipped: 0,
     };
+    const sentHistoryKeys = new Set<string>();
 
     for (const schedule of schedules) {
       try {
@@ -95,30 +108,59 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // 既に送信済みかチェック（user_idがある場合はuser_id、ない場合はemailで照合）
-        let existingQuery = supabase
+        const normalizedEmail = normalizeHistoryEmail(schedule.email);
+        const emailHistoryKey = createEmailHistoryKey(schedule.email, schedule.email_type);
+        const userHistoryKey = createUserHistoryKey(schedule.user_id ?? null, schedule.email_type);
+
+        if (sentHistoryKeys.has(emailHistoryKey) || (userHistoryKey && sentHistoryKeys.has(userHistoryKey))) {
+          await supabase
+            .from('email_schedules')
+            .update({ status: 'cancelled', processing_started_at: null, processing_id: null })
+            .eq('id', schedule.id);
+
+          results.skipped++;
+          continue;
+        }
+
+        let hasExistingByUser = false;
+        if (schedule.user_id) {
+          const { data: existingByUser, error: existingByUserError } = await supabase
+            .from('email_sent_history')
+            .select('id')
+            .eq('email_type', schedule.email_type)
+            .eq('user_id', schedule.user_id)
+            .limit(1);
+
+          if (existingByUserError) {
+            console.error('Error checking sent history by user_id:', existingByUserError);
+          }
+
+          hasExistingByUser = Array.isArray(existingByUser) && existingByUser.length > 0;
+        }
+
+        const { data: existingByEmail, error: existingByEmailError } = await supabase
           .from('email_sent_history')
           .select('id')
-          .eq('email_type', schedule.email_type);
+          .eq('email_type', schedule.email_type)
+          .ilike('email', normalizedEmail)
+          .limit(1);
 
-        if (schedule.user_id) {
-          existingQuery = existingQuery.eq('user_id', schedule.user_id);
-        } else {
-          existingQuery = existingQuery.eq('email', schedule.email);
+        if (existingByEmailError) {
+          console.error('Error checking sent history by email:', existingByEmailError);
         }
 
-        const { data: existingList, error: existingError } = await existingQuery.limit(1);
-        if (existingError) {
-          console.error('Error checking sent history:', existingError);
-        }
-
-        const existing = Array.isArray(existingList) ? existingList[0] : null;
-        if (existing) {
+        const hasExistingByEmail = Array.isArray(existingByEmail) && existingByEmail.length > 0;
+        if (hasExistingByUser || hasExistingByEmail) {
           // 既に送信済み → スキップ
           await supabase
             .from('email_schedules')
             .update({ status: 'cancelled', processing_started_at: null, processing_id: null })
             .eq('id', schedule.id);
+
+          if (userHistoryKey) {
+            sentHistoryKeys.add(userHistoryKey);
+          }
+          sentHistoryKeys.add(emailHistoryKey);
 
           results.skipped++;
           continue;
@@ -131,8 +173,8 @@ export async function GET(request: NextRequest) {
         );
 
         // 送信履歴に記録
-        const historyRecord: any = {
-          email: schedule.email,
+        const historyRecord: { email: string; email_type: string; user_id?: string } = {
+          email: normalizedEmail,
           email_type: schedule.email_type,
         };
         if (schedule.user_id) {
@@ -153,6 +195,11 @@ export async function GET(request: NextRequest) {
             last_error: null,
           })
           .eq('id', schedule.id);
+
+        if (userHistoryKey) {
+          sentHistoryKeys.add(userHistoryKey);
+        }
+        sentHistoryKeys.add(emailHistoryKey);
 
         results.sent++;
       } catch (error) {

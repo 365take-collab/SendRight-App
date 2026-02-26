@@ -36,7 +36,7 @@ export function checkRateLimit(userId: string): { allowed: boolean; remaining: n
   const key = `rate_limit:${userId}`;
   const record = rateLimitRecords.get(key);
 
-  if (!record || now > record.resetAt) {
+  if (!record || now >= record.resetAt) {
     // 新しいウィンドウを開始
     const newRecord: RateLimitRecord = {
       userId,
@@ -131,7 +131,7 @@ export function detectAnomalousPattern(
   // 1. 短時間に大量のリクエスト（1分間に30回以上）
   const oneMinuteAgo = now - 60 * 1000;
   const recentRequests = records.filter(r => r.timestamp > oneMinuteAgo);
-  if (recentRequests.length > 30) {
+  if (recentRequests.length >= 30) {
     console.warn('異常検出: 短時間に大量のリクエスト', {
       userId,
       count: recentRequests.length,
@@ -145,7 +145,7 @@ export function detectAnomalousPattern(
   const samePathRequests = records.filter(
     r => r.timestamp > oneSecondAgo && r.path === requestPath
   );
-  if (samePathRequests.length > 5) {
+  if (samePathRequests.length >= 5) {
     console.warn('異常検出: 同じパスへの連続アクセス', {
       userId,
       path: requestPath,
@@ -162,7 +162,7 @@ export function detectAnomalousPattern(
         .filter(r => r.timestamp > fiveMinutesAgo && r.ip)
         .map(r => r.ip!)
     );
-    if (recentIPs.size > 3) {
+    if (recentIPs.size >= 3) {
       console.warn('異常検出: 複数のIPアドレスからの同時アクセス', {
         userId,
         ipCount: recentIPs.size,
@@ -216,7 +216,7 @@ export function shouldRefreshSession(sessionTimestamp: number): boolean {
   const sessionMaxAge = 24 * 60 * 60 * 1000; // 1日
   const sessionAge = now - sessionTimestamp;
   const halfMaxAge = sessionMaxAge / 2;
-  return sessionAge > halfMaxAge;
+  return sessionAge >= halfMaxAge;
 }
 
 /**
