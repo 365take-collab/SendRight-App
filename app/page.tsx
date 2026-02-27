@@ -109,6 +109,7 @@ export default function Home() {
     // ローカルストレージにユーザー情報があれば復元される（別のuseEffectで処理）
 
     // 使用回数情報を取得（開発モードでない場合）
+    let usageTimeoutId: ReturnType<typeof setTimeout> | null = null;
     if (!isDevMode) {
       // tokenが設定されるまで待つ
       const fetchUsageInfo = async () => {
@@ -137,7 +138,7 @@ export default function Home() {
       };
       
       // 少し遅延させてから実行（tokenが設定されるのを待つ）
-      setTimeout(fetchUsageInfo, 100);
+      usageTimeoutId = setTimeout(fetchUsageInfo, 100);
     }
 
     // Initialize Speech Recognition
@@ -217,6 +218,9 @@ export default function Home() {
     }
 
     return () => {
+      if (usageTimeoutId) {
+        clearTimeout(usageTimeoutId);
+      }
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -327,6 +331,9 @@ export default function Home() {
     localStorage.removeItem('sendright_user');
     setUser(null);
     setToken(null);
+    // Cookieクリア（middleware.tsの認証用）
+    document.cookie = 'token=; path=/; max-age=0';
+    document.cookie = 'userId=; path=/; max-age=0';
     // 注意: setUser(null)により、ログイン/登録ページが表示される
   };
 

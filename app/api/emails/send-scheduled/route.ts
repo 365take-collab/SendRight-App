@@ -68,6 +68,64 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const emailTypes = Array.from(
+      new Set(
+        schedules
+          .map((schedule) => schedule.email_type)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      )
+    );
+    const userIds = Array.from(
+      new Set(
+        schedules
+          .map((schedule) => schedule.user_id)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      )
+    );
+    const emails = Array.from(
+      new Set(
+        schedules
+          .map((schedule) => schedule.email)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      )
+    );
+
+    const sentHistoryKeys = new Set<string>();
+
+    if (emailTypes.length > 0 && userIds.length > 0) {
+      const { data: historyByUser, error: historyUserError } = await supabase
+        .from('email_sent_history')
+        .select('email_type, user_id')
+        .in('email_type', emailTypes)
+        .in('user_id', userIds);
+
+      if (historyUserError) {
+        console.error('Error prefetching sent history (user_id):', historyUserError);
+      } else {
+        for (const row of historyByUser ?? []) {
+          if (!row?.email_type || !row?.user_id) continue;
+          sentHistoryKeys.add(`${row.email_type}|user:${row.user_id}`);
+        }
+      }
+    }
+
+    if (emailTypes.length > 0 && emails.length > 0) {
+      const { data: historyByEmail, error: historyEmailError } = await supabase
+        .from('email_sent_history')
+        .select('email_type, email')
+        .in('email_type', emailTypes)
+        .in('email', emails);
+
+      if (historyEmailError) {
+        console.error('Error prefetching sent history (email):', historyEmailError);
+      } else {
+        for (const row of historyByEmail ?? []) {
+          if (!row?.email_type || !row?.email) continue;
+          sentHistoryKeys.add(`${row.email_type}|email:${row.email}`);
+        }
+      }
+    }
+
     // 各メールを送信
     const results = {
       sent: 0,
@@ -95,25 +153,10 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // 既に送信済みかチェック（user_idがある場合はuser_id、ない場合はemailで照合）
-        let existingQuery = supabase
-          .from('email_sent_history')
-          .select('id')
-          .eq('email_type', schedule.email_type);
-
-        if (schedule.user_id) {
-          existingQuery = existingQuery.eq('user_id', schedule.user_id);
-        } else {
-          existingQuery = existingQuery.eq('email', schedule.email);
-        }
-
-        const { data: existingList, error: existingError } = await existingQuery.limit(1);
-        if (existingError) {
-          console.error('Error checking sent history:', existingError);
-        }
-
-        const existing = Array.isArray(existingList) ? existingList[0] : null;
-        if (existing) {
+        const historyKey = schedule.user_id
+          ? `${schedule.email_type}|user:${schedule.user_id}`
+          : `${schedule.email_type}|email:${schedule.email}`;
+        if (sentHistoryKeys.has(historyKey)) {
           // 既に送信済み → スキップ
           await supabase
             .from('email_schedules')
@@ -141,6 +184,7 @@ export async function GET(request: NextRequest) {
         await supabase
           .from('email_sent_history')
           .insert(historyRecord);
+        sentHistoryKeys.add(historyKey);
 
         // スケジュールを更新
         await supabase

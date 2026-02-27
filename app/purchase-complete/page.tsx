@@ -44,9 +44,12 @@ function PurchaseCompleteContent() {
     }, 1000);
 
     // 紙吹雪エフェクトを3秒後に消す
-    setTimeout(() => setShowConfetti(false), 3000);
+    const confettiTimeout = setTimeout(() => setShowConfetti(false), 3000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(confettiTimeout);
+    };
   }, [sessionId]);
 
   const minutes = Math.floor(timeLeft / 60);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Referral {
@@ -27,6 +27,8 @@ export default function ReferralPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchReferralData = async () => {
@@ -88,12 +90,26 @@ export default function ReferralPage() {
     fetchReferralData();
   }, [router]);
 
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+      if (copiedMessageTimerRef.current) {
+        clearTimeout(copiedMessageTimerRef.current);
+      }
+    };
+  }, []);
+
   const copyLink = async () => {
     if (data?.referralLink) {
       try {
         await navigator.clipboard.writeText(data.referralLink);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (copiedTimerRef.current) {
+          clearTimeout(copiedTimerRef.current);
+        }
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
       } catch {
         // フォールバック
         const textArea = document.createElement('textarea');
@@ -103,7 +119,10 @@ export default function ReferralPage() {
         document.execCommand('copy');
         document.body.removeChild(textArea);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (copiedTimerRef.current) {
+          clearTimeout(copiedTimerRef.current);
+        }
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
       }
     }
   };
@@ -122,7 +141,10 @@ ${data?.referralLink || 'https://sendright.jp'}`;
     try {
       await navigator.clipboard.writeText(message);
       setCopiedMessage(true);
-      setTimeout(() => setCopiedMessage(false), 2000);
+      if (copiedMessageTimerRef.current) {
+        clearTimeout(copiedMessageTimerRef.current);
+      }
+      copiedMessageTimerRef.current = setTimeout(() => setCopiedMessage(false), 2000);
     } catch {
       const textArea = document.createElement('textarea');
       textArea.value = message;
@@ -131,7 +153,10 @@ ${data?.referralLink || 'https://sendright.jp'}`;
       document.execCommand('copy');
       document.body.removeChild(textArea);
       setCopiedMessage(true);
-      setTimeout(() => setCopiedMessage(false), 2000);
+      if (copiedMessageTimerRef.current) {
+        clearTimeout(copiedMessageTimerRef.current);
+      }
+      copiedMessageTimerRef.current = setTimeout(() => setCopiedMessage(false), 2000);
     }
   };
 
