@@ -10,7 +10,11 @@ const JWT_SECRET = (() => {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET is required in production');
   }
-  return 'dev-only-secret';
+
+  // Avoid predictable fallback secrets in non-production environments.
+  const ephemeralSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('JWT_SECRET is not set. Using an ephemeral runtime secret for this process only.');
+  return ephemeralSecret;
 })();
 
 // ========================================
