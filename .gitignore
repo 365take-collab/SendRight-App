@@ -61,3 +61,8 @@ next-env.d.ts
 # Claude Code / MCP (may include secrets)
 .mcp.local.json
 .mcp.runtime.json
+
+# Environment variables
+.env.local
+.env.*.local
+!.env.local.example
