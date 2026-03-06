@@ -854,44 +854,55 @@ async function sendReferralBonusViaResend(
 ): Promise<{ sent: boolean; threshold?: number }> {
   const { sendReferralBonusEmail } = await import('@/lib/resend');
   const thresholds = [3, 5, 10];
+  const targetThresholds = thresholds.filter(
+    (threshold) => newReferralCount >= threshold && oldReferralCount < threshold
+  );
 
-  for (const threshold of thresholds) {
-    if (newReferralCount >= threshold && oldReferralCount < threshold) {
-      const bonusName = REFERRAL_BONUS_THRESHOLDS[threshold];
-      if (!bonusName) continue;
+  if (targetThresholds.length === 0) {
+    return { sent: false };
+  }
 
-      try {
-        // 既に送信済みかチェック
-        const { data: existingBonus } = await getSupabaseClient()
-          .from('sendright_referral_bonuses')
-          .select('id')
-          .eq('user_email', email)
-          .eq('bonus_type', `bonus_${threshold}`)
-          .single();
+  const targetBonusTypes = targetThresholds.map((threshold) => `bonus_${threshold}`);
+  const { data: existingBonuses, error: existingBonusesError } = await getSupabaseClient()
+    .from('sendright_referral_bonuses')
+    .select('bonus_type')
+    .eq('user_email', email)
+    .in('bonus_type', targetBonusTypes);
 
-        if (existingBonus) {
-          console.log(`Already sent bonus_${threshold} to ${email}`);
-          continue;
-        }
+  if (existingBonusesError) {
+    console.error(`Error fetching existing referral bonuses for ${email}:`, existingBonusesError);
+  }
 
-        // Resendでメール送信
-        await sendReferralBonusEmail(email, threshold, bonusName);
+  const existingBonusTypes = new Set((existingBonuses ?? []).map((bonus) => bonus.bonus_type));
 
-        // 送信履歴を記録
-        await getSupabaseClient()
-          .from('sendright_referral_bonuses')
-          .insert({
-            user_email: email,
-            bonus_type: `bonus_${threshold}`,
-            bonus_name: bonusName,
-            delivery_method: 'resend',
-          });
+  for (const threshold of targetThresholds) {
+    const bonusType = `bonus_${threshold}`;
+    const bonusName = REFERRAL_BONUS_THRESHOLDS[threshold];
+    if (!bonusName) continue;
 
-        console.log(`Sent referral bonus (${threshold}) to ${email} via Resend`);
-        return { sent: true, threshold };
-      } catch (error) {
-        console.error(`Error sending referral bonus for ${email} at threshold ${threshold}:`, error);
-      }
+    if (existingBonusTypes.has(bonusType)) {
+      console.log(`Already sent ${bonusType} to ${email}`);
+      continue;
+    }
+
+    try {
+      // Resendでメール送信
+      await sendReferralBonusEmail(email, threshold, bonusName);
+
+      // 送信履歴を記録
+      await getSupabaseClient()
+        .from('sendright_referral_bonuses')
+        .insert({
+          user_email: email,
+          bonus_type: bonusType,
+          bonus_name: bonusName,
+          delivery_method: 'resend',
+        });
+
+      console.log(`Sent referral bonus (${threshold}) to ${email} via Resend`);
+      return { sent: true, threshold };
+    } catch (error) {
+      console.error(`Error sending referral bonus for ${email} at threshold ${threshold}:`, error);
     }
   }
 
