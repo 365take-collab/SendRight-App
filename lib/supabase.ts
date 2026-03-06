@@ -852,7 +852,6 @@ async function sendReferralBonusViaResend(
   newReferralCount: number,
   oldReferralCount: number
 ): Promise<{ sent: boolean; threshold?: number }> {
-  const { sendReferralBonusEmail } = await import('@/lib/resend');
   const thresholds = [3, 5, 10];
   const targetThresholds = thresholds.filter(
     (threshold) => newReferralCount >= threshold && oldReferralCount < threshold
@@ -871,9 +870,11 @@ async function sendReferralBonusViaResend(
 
   if (existingBonusesError) {
     console.error(`Error fetching existing referral bonuses for ${email}:`, existingBonusesError);
+    return { sent: false };
   }
 
   const existingBonusTypes = new Set((existingBonuses ?? []).map((bonus) => bonus.bonus_type));
+  const { sendReferralBonusEmail } = await import('@/lib/resend');
 
   for (const threshold of targetThresholds) {
     const bonusType = `bonus_${threshold}`;
