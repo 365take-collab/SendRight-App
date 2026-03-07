@@ -853,9 +853,16 @@ async function sendReferralBonusViaResend(
   oldReferralCount: number
 ): Promise<{ sent: boolean; threshold?: number }> {
   const thresholds = [3, 5, 10];
-  const targetThresholds = thresholds.filter(
-    (threshold) => newReferralCount >= threshold && oldReferralCount < threshold
-  );
+  const targetThresholds = thresholds
+    .filter((threshold) => newReferralCount >= threshold)
+    .sort((a, b) => {
+      const aJustReached = a > oldReferralCount ? 0 : 1;
+      const bJustReached = b > oldReferralCount ? 0 : 1;
+      if (aJustReached !== bJustReached) {
+        return aJustReached - bJustReached;
+      }
+      return a - b;
+    });
 
   if (targetThresholds.length === 0) {
     return { sent: false };
