@@ -870,6 +870,7 @@ async function sendReferralBonusViaResend(
 
   if (existingBonusesError) {
     console.error(`Error fetching existing referral bonuses for ${email}:`, existingBonusesError);
+    return { sent: false };
   }
 
   const existingBonusTypes = new Set((existingBonuses ?? []).map((bonus) => bonus.bonus_type));
