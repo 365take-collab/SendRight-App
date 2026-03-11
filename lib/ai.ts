@@ -221,86 +221,102 @@ export interface ResponseWithExplanation {
   alternatives?: AlternativeResponse[]; // 代替返信候補（それぞれに解説付き）
 }
 
+export function sanitizeGeneratedReply(rawReply: string, maxSentences = 2): string {
+  let reply = rawReply
+    .replace(/^(返信[：:]\s*)/i, '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+  reply = reply
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[。、]{2,}/g, '。');
+
+  const newlineSentences = reply
+    .split('\n')
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  const sentences = newlineSentences.length > 1
+    ? newlineSentences
+    : reply
+        .split(/(?<=[。！？\?])/)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean);
+
+  if (sentences.length === 0) {
+    return reply;
+  }
+
+  const limited = sentences.slice(0, Math.max(1, maxSentences));
+  const compact = limited.join(limited.length > 1 ? '\n' : '');
+  const singleLineLength = compact.replace(/\n/g, '').length;
+
+  if (singleLineLength > 70) {
+    return limited[0];
+  }
+
+  return compact;
+}
+
 export async function generateResponse(context: MessageContext): Promise<ResponseWithExplanation> {
   const toneInstruction = buildToneInstruction(context.tone);
   const successPatternsSection = buildSuccessPatternsSection(context.successPatterns);
   const systemPrompt = `あなたは、LINEやDMで女性と自然に会話する返信を提案する専門家です。
-**最重要**: 返信は「戦略的」ではなく「自然で人間らしい会話」を心がけてください。
+**最重要**: 返信はテクニック感よりも、相手の発言にちゃんと反応した自然な会話を優先してください。
 
-【メッセージの7か条（絶対原則）】
-1. **一方的に気持ちを伝えない** - 自分の感情を押し付けない。相手の温度感に合わせる
-2. **無理にネタを作らない** - 取ってつけた理由や言い訳は女々しい印象を与える
-3. **いきなりオファーしない** - 最初から誘うのはNG。キャッチボールを経てから
-4. **ライトメール** - 「元気？」「最近どう？」など軽い入りが万能
-5. **絵文字・顔文字・スタンプは不要** - 気持ちが丸わかりで退屈。謎解き要素を残す
-6. **気遣いすぎない** - 「急にごめんね」などは心の壁を感じさせる
-7. **返信を催促しない** - 「返信くれたら嬉しい」は説得と同じ。逆効果
+【優先ルール】
+1. まず相手の直前の発言に自然に答える
+2. 無理に弄らない 無理に話題を飛ばさない
+3. 短く返すが 省略しすぎて不自然にしない
+4. 相手の温度感に合わせる
+5. 質問には答えを先に書いてから必要なら返す
 
-【Sへのすり替え作業（核心原則）】
-- **定義**: 相手の発言やリアクションを使って、会話を面白い方向に展開する技術
-- **手順**: 
-  1) 相手の発言からキーワードを拾う
-  2) そのキーワードを使って別の話題や弄りに展開
-  3) 自然な流れで次の展開を作る
-- **パターン例**:
-  - 相手の発言を使う: 「コーラがいい」→「コーラゼロじゃなくて？カロリー気にしてないんだ笑」
-  - 相手の状況を使う: 「買い物してた」→「これ以上何買うの？笑」
-  - キャラクターすり替え: 「めんどくさい」→「めんどくさいキャラなんだ笑」
-- **注意**: すり替えた後は必ずフォローを入れる（弄りっぱなしにしない）
+【展開の付け方】
+- 軽い広げ方や少しの冗談は使ってよい
+- ただし毎回やる必要はない
+- 直接答えた方が自然なら そのまま素直に返す
+- 弄る場合も 相手が嫌がりそうなら避ける
 
-【ライトな不明さ（重要）】
-- なぜ連絡したのか分からない、でも嫌な感じはしない
-- 気持ちが読めない状態を作る → 相手の興味を引く
-- 全部伝えようとしない。会話の過程を楽しむ
+【自然さの基準】
+- 会話の流れを無視しない
+- 変にノウハウっぽい言い回しにしない
+- 普通の人がそのまま送る文にする
+- 絵文字 スタンプ 露骨な長文は避ける
 
 【会話の盛り上げ方】
-- **共感をメインに**: 「面倒くさいね」「大変だよね」「早く戻って欲しいね」
-- **枝葉を付け足す**: 直接質問より、話題の枝葉を付け足すと伸びやすい
-- **結論は言わない**: 悲観的な結論や正論は会話を止める。結論はクロージングまで控える
-- **悪共有**: 共通の敵や愚痴の共有で距離が縮まる
-
-【オファーのタイミング】
-- **いきなりはNG**: まずキャッチボールで温める
-- **自然な流れで**: 会話が盛り上がったタイミングで
-- **軽いノリで**: 「いい加減飲みに行こうぜ」「そろそろいいでしょ？」
-- **ダブルバインド**: 「カフェ行く？それとも映画？」
+- 共感や相づちを先に置くと自然な場合が多い
+- 直接質問だけで終わらず 一言の感想や枝葉を添えると返しやすい
+- 正論で締めない
 
 【基本原則】
-1. **基本は1文のみ**。必要時のみ2文（最大50文字）
-2. **自然な口語表現**（「〜ある？」「〜してる？」など助詞省略）
-3. **質問への対応**: 必ず答えを先に書いてから逆質問
-4. **会話の流れを保つ**: 相手のメッセージに直接反応
-5. **返信しやすさ**: 具体的な質問、選択肢型質問
+1. 基本は1文 必要な時だけ2文
+2. 自然な口語表現
+3. 会話の流れを保つ
+4. 相手が返しやすい余白を残す
 
 【NGパターン】
-- ❌ 3文以上、50文字超
-- ❌ 「、」「。」の使用（一切使用しない）
-- ❌ 絵文字・スタンプ
-- ❌ 堅苦しい表現（「君は」「あなたは」）
-- ❌ 会話の流れを無視
-- ❌ 一方的に気持ちを伝える
-- ❌ 無理な理由付け
-- ❌ いきなりオファー（初回メッセージ）
-- ❌ 気遣いすぎ（「急にごめんね」など）
-- ❌ 返信催促（「返信くれたら嬉しい」など）
+- ❌ 3文以上
+- ❌ 露骨に作った感じのある弄り
+- ❌ 会話の流れを無視した話題転換
+- ❌ 堅苦しい表現
+- ❌ 一方的な感情表現
+- ❌ いきなりオファー
+- ❌ 返信催促
 
 【返信生成チェック】
 1. 相手の発言に反応しているか（最優先）
-2. Sへのすり替えができているか
-3. ライトな不明さがあるか（気持ちが丸わかりになっていないか）
-4. 共感・悪共有ができているか
-5. 1-2文、50文字以内か
-6. 自然な口語表現か
-7. オファーは自然なタイミングか（いきなりではないか）
+2. 素直に返した方が自然なのに 無理に捻っていないか
+3. 共感や温度感がズレていないか
+4. 1-2文で収まっているか
+5. 自然な口語表現か
 
 **最重要ルール**:
-1. Sへのすり替えを最優先
-2. ライトな不明さを保つ
+1. まず自然に答える
+2. 無理に技巧的にしない
 3. 基本は1文のみ（必要時のみ2文）
-4. 自然な口語表現
-5. 1文30文字、2文50文字以内
-6. 質問には必ず答えを先に書く
-7. 「。」「、」は一切使用しない
+4. 質問には答えを先に書く
+5. 句読点は使ってよいが 多すぎる説明調にはしない
 ${toneInstruction ? `\n${toneInstruction}` : ''}`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -368,55 +384,43 @@ ${historyText}
 
 【返信の要件】
 
-**1. Sへのすり替え作業（最重要）**
-- 相手の発言からキーワードを拾い、別の話題や弄りに展開する
-- 例: 「コーラがいい」→「コーラゼロじゃなくて？笑」
-- 例: 「買い物してた」→「これ以上何買うの？笑」
-- すり替えた後はフォローを入れる（弄りっぱなしにしない）
+**1. まず自然に反応する**
+- 相手の発言に直接つながる返しを優先する
+- 無理に弄ったり話題転換しない
 
-**2. ライトな不明さを保つ**
-- 気持ちを全部伝えない。相手に「なんで連絡してきたんだろう？」と思わせる
-- 一方的に気持ちを伝えない
-- 無理な理由付けをしない（「〇〇の話になって思い出して」などは女々しい）
+**2. 軽い展開は必要な時だけ**
+- 少し冗談っぽく広げるのは可
+- ただし素直な返答の方が自然ならそのまま返す
 
-**3. メッセージの7か条を守る**
-- いきなりオファーしない（キャッチボールを経てから）
-- 絵文字・顔文字・スタンプは不要
-- 「急にごめんね」など気遣いすぎない
-- 「返信くれたら嬉しい」など催促しない
+**3. 共感や温度感**
+- 相手が疲れていそうならまず共感
+- テンションが高ければ少し軽く返してよい
 
-**4. 共感・悪共有**
-- 「面倒くさいね」「大変だよね」など共感をメインに
-- 枝葉を付け足す（直接質問より話題の枝葉を付け足すと伸びやすい）
-- 結論や正論は言わない（会話が止まる）
-
-**5. 基本は1文のみ**
+**4. 基本は1文のみ**
 - 会話の転換やつなぎが必要な場合のみ2文
 - 絶対に3文以上にしない
-- 1文は最大30文字、2文でも合計50文字以内
 
-**6. 質問への対応**
+**5. 質問への対応**
 - 質問には**必ず答えを先に書く**（「うん」「いや」など短くてもOK）
 - その後に逆質問を返す（例：「鶏の炭火焼き！\n逆にどんなの好き？」）
 - 質問に対して質問だけを返すのは絶対NG
 
-**7. 自然な口語表現**
+**6. 自然な口語表現**
 - 「〜ある？」「〜してる？」など助詞省略
 - 「君は」「あなたは」など堅苦しい表現は避ける
 
-**8. 絶対に使わない**
-- 「、」「。」は一切使用しない
+**7. 避けること**
 - 絵文字・スタンプ
-- 「今度」の多用
+- 取ってつけた感じの強い理由付け
 - 一方的な感情表現
 
-**9. オファーのタイミング**
+**8. オファーのタイミング**
 - いきなりはNG。キャッチボールを経てから
 - 会話が盛り上がったタイミングで自然に
 - 「いい加減飲みに行こうぜ」「そろそろいいでしょ？」など軽いノリで
 - ダブルバインド活用（「カフェ行く？それとも映画？」）
 
-${context.fullConversationText || context.conversationHistory ? '**10. 会話の流れを踏まえた自然な返信**（会話の流れを無視しない）' : ''}
+${context.fullConversationText || context.conversationHistory ? '**9. 会話の流れを踏まえた自然な返信**（会話の流れを無視しない）' : ''}
 
 【出力形式】
 以下の形式で必ず出力してください：
@@ -427,7 +431,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
 解説:
 [ここに返信の解説を記述。以下の観点を**必ず全て含めて**、**完全に**説明してください：
 - **Sへのすり替え**: 相手の発言のどの部分を拾って、どう展開したか
-- **ライトな不明さ**: 気持ちが丸わかりになっていないか、謎解き要素があるか
+- **自然さ**: 無理な展開になっていないか
 - **共感・悪共有**: 相手の感情に寄り添っているか
 - **会話の流れ**: 相手のメッセージにどう反応しているか
 - **返信しやすさ**: 相手が返信しやすい内容になっているか
@@ -478,7 +482,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
       const completion = await openai.chat.completions.create({
         model: AI_MODEL,
         messages,
-        temperature: 0.85,
+        temperature: 0.65,
         max_tokens: 500,
       });
 
@@ -501,12 +505,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
     let response = responseMatch ? responseMatch[1].trim() : content.trim();
     const explanation = explanationMatch ? explanationMatch[1].trim() : '解説を生成できませんでした。';
     
-    // 「。」を削除（一切使用しない）
-    response = response.replace(/。/g, '');
-    // 「、」を削除（一切使用しない）
-    response = response.replace(/、/g, '');
-    // 連続する改行を1つに統一
-    response = response.replace(/\n{3,}/g, '\n\n');
+    response = sanitizeGeneratedReply(response);
     
     // 返信の長さをチェック（基本は1文、必要時のみ2文）
     const sentences = response.split(/\n/).filter((s: string) => s.trim().length > 0);
@@ -537,8 +536,8 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
       }
     }
     
-    // 文字数チェック（50文字を超える場合、1文のみに短縮）
-    if (response.replace(/\n/g, '').length > 50) {
+    // 文字数チェック（長すぎる場合、1文のみに短縮）
+    if (response.replace(/\n/g, '').length > 70) {
       // 最初の文のみを使用
       const firstSentence = sentences[0] || response.split(/\n/)[0];
       response = firstSentence.trim();
@@ -552,8 +551,8 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
       const alternativePrompt = `${userPrompt}
 
 上記と同じメッセージに対して、異なるアプローチで2つの代替返信を生成してください。
-1つ目は「Sへのすり替えを強めに使った弄り系アプローチ」
-2つ目は「共感・悪共有を強めに使ったアプローチ」
+1つ目は「少し playful に広げるアプローチ」
+2つ目は「共感を優先するアプローチ」
 メインの返信とは異なる戦略を使用してください。
 
 【出力形式】
@@ -562,24 +561,24 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
 候補1:
 返信: [返信テキスト]
 解説: [5-7文程度の詳しい解説。以下の観点を必ず全て含めて完全に説明してください：
-- **Sへのすり替え**: 相手の発言のどの部分を拾って、どう展開したか
-- **ライトな不明さ**: 気持ちが丸わかりになっていないか
-- **弄りとフォロー**: 弄った後にフォローを入れているか
+- **自然な広げ方**: 相手の発言のどの部分を拾ってどう展開したか
+- **自然さ**: 作った感じが出ていないか
+- **軽さ**: 重くならず返しやすいか
 - メインの返信とどう違うのか、この返信の特徴は何か
 **重要**: 解説は必ず完全に終わらせてください。途中で切れないように、最後まで書き切ってください]
 
 候補2:
 返信: [返信テキスト]
 解説: [5-7文程度の詳しい解説。以下の観点を必ず全て含めて完全に説明してください：
-- **共感・悪共有**: 相手の感情にどう寄り添っているか
+- **共感**: 相手の感情にどう寄り添っているか
 - **枝葉の付け足し**: 話題をどう広げているか
 - **返信しやすさ**: 相手が返信しやすい内容になっているか
 - メインの返信とどう違うのか、この返信の特徴は何か
 **重要**: 解説は必ず完全に終わらせてください。途中で切れないように、最後まで書き切ってください]
 
 **重要**: 
-- 各返信は1-2文、50文字以内
-- 「、」「。」は一切使用しない
+- 各返信は1-2文
+- 短く自然な口語にする
 - 解説は5-7文程度で詳しく、必ず完全に終わらせる
 - 教材名や特定の手法名は一切言及しない
 - 解説が途中で切れないように、必ず最後まで書き切ってください`;
@@ -621,7 +620,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
             { role: 'system', content: systemPrompt },
             { role: 'user', content: alternativePrompt }
           ],
-          temperature: 0.9,
+          temperature: 0.7,
           max_tokens: 800,
         });
 
@@ -655,19 +654,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
           let altResponse1 = candidate1ResponseMatch[1].trim();
           const altExplanation1 = candidate1ExplanationMatch ? candidate1ExplanationMatch[1].trim() : '解説を生成できませんでした。';
           
-          // 「。」を削除（一切使用しない）
-          altResponse1 = altResponse1.replace(/。/g, '');
-          // 「、」を削除（一切使用しない）
-          altResponse1 = altResponse1.replace(/、/g, '');
-          altResponse1 = altResponse1.replace(/\n{3,}/g, '\n\n');
-          
-          const altSentences1 = altResponse1.split(/\n/).filter((s: string) => s.trim().length > 0);
-          if (altSentences1.length > 2) {
-            altResponse1 = altSentences1.slice(0, 2).join('\n');
-          }
-          if (altResponse1.replace(/\n/g, '').length > 50) {
-            altResponse1 = (altSentences1[0] || altResponse1.split(/\n/)[0]).trim();
-          }
+          altResponse1 = sanitizeGeneratedReply(altResponse1);
           
           alternatives.push({
             response: altResponse1.trim(),
@@ -692,19 +679,7 @@ ${context.fullConversationText || context.conversationHistory ? '**10. 会話の
           let altResponse2 = candidate2ResponseMatch[1].trim();
           const altExplanation2 = candidate2ExplanationMatch ? candidate2ExplanationMatch[1].trim() : '解説を生成できませんでした。';
           
-          // 「。」を削除（一切使用しない）
-          altResponse2 = altResponse2.replace(/。/g, '');
-          // 「、」を削除（一切使用しない）
-          altResponse2 = altResponse2.replace(/、/g, '');
-          altResponse2 = altResponse2.replace(/\n{3,}/g, '\n\n');
-          
-          const altSentences2 = altResponse2.split(/\n/).filter((s: string) => s.trim().length > 0);
-          if (altSentences2.length > 2) {
-            altResponse2 = altSentences2.slice(0, 2).join('\n');
-          }
-          if (altResponse2.replace(/\n/g, '').length > 50) {
-            altResponse2 = (altSentences2[0] || altResponse2.split(/\n/)[0]).trim();
-          }
+          altResponse2 = sanitizeGeneratedReply(altResponse2);
           
           alternatives.push({
             response: altResponse2.trim(),
@@ -804,9 +779,9 @@ export async function generateGoalDrivenResponse(context: MessageContext): Promi
 - **ダブルバインド**: 「カフェ行く？それとも映画？」（No以外の選択肢）
 
 【基本原則】
-1. **基本は1文のみ**。必要時のみ2文（最大50文字）
+1. **基本は1文のみ**。必要時のみ2文（短く自然に）
 2. **自然な口語表現**
-3. **「。」「、」は一切使用しない**
+3. **質問には答えを先に書く**
 ${toneInstruction ? `\n${toneInstruction}` : ''}`;
 
   const goalUserPrompt = `【ゴール】${goalLabel}
@@ -824,7 +799,7 @@ ${context.fullConversationText || context.herMessage}${context.profileContext ? 
 - 恋愛特化AIとして、遠慮なく踏み込んだアドバイスをしてください
 - 「相手を尊重して...」「無理強いしないで...」などの一般論は不要
 - 具体的な戦略とメッセージを提案してください
-- メッセージは1-2文、50文字以内、「。」「、」は使用しない【出力形式】
+- メッセージは1-2文で短く自然にする【出力形式】
 必ず以下の形式で出力してください：
 
 分析:
@@ -833,7 +808,7 @@ ${context.fullConversationText || context.herMessage}${context.profileContext ? 
 タイミング: [now/soon/not_yet]
 状況サマリー: [現在の会話状況を2-3文で分析]戦略:
 [「${goalLabel}」を達成するための戦略を2-3文で。具体的なアプローチを提案]今送るべきメッセージ:
-[メッセージ（1-2文、50文字以内、「。」「、」不使用）]解説:
+[メッセージ（1-2文で短く自然）]解説:
 [なぜこのメッセージが効果的か、どう「${goalLabel}」に近づくかを3-4文で]
 
 次の展開:
@@ -859,7 +834,7 @@ ${context.fullConversationText || context.herMessage}${context.profileContext ? 
           { role: 'system', content: goalSystemPrompt },
           { role: 'user', content: goalUserPrompt },
         ],
-        temperature: 0.8,
+        temperature: 0.65,
         max_tokens: 1000,
       });
       content = completion.choices[0]?.message?.content || '';
@@ -909,10 +884,7 @@ ${context.fullConversationText || context.herMessage}${context.profileContext ? 
     }
 
     let currentMessage = messageMatch ? messageMatch[1].trim() : '';
-    // 「。」「、」を削除
-    currentMessage = currentMessage.replace(/[。、]/g, '');
-    // 改行を整理
-    currentMessage = currentMessage.replace(/\n{2,}/g, '\n');
+    currentMessage = sanitizeGeneratedReply(currentMessage);
 
     return {
       analysis: {
