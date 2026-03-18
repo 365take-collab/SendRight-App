@@ -43,15 +43,15 @@ describe('sanitizeGeneratedReply', () => {
     expect(reply).toBe('それめっちゃ大変だったね。\n無理しすぎないでね。');
   });
 
-  it('AI Gateway 利用時は provider 情報に Gateway 経由のモデルIDを含む', async () => {
+  it('AI Gateway 利用時も既定優先順に従った provider 情報を返す', async () => {
     process.env.OPENAI_API_KEY = '';
     process.env.AI_GATEWAY_API_KEY = 'test-gateway';
 
     const { getAiProviderInfo } = await importFreshAi();
     expect(getAiProviderInfo()).toEqual({
-      provider: 'openai',
-      model: 'openai/gpt-4o-mini',
-      label: 'OpenAI openai/gpt-4o-mini via Vercel AI Gateway',
+      provider: 'deepseek',
+      model: 'deepseek/deepseek-chat',
+      label: 'DeepSeek deepseek/deepseek-chat via Vercel AI Gateway',
     });
   });
 });

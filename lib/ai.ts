@@ -44,12 +44,12 @@ if (aiProviderEnv === 'anthropic') {
   useDeepSeek = true;
 } else if (aiProviderEnv === 'openai' || aiProviderEnv === '') {
   // Default: DeepSeek(if set) -> OpenAI
-  useDeepSeek = aiProviderEnv === '' && hasAiProviderKey('deepseek') && !gatewayEnabled;
+  useDeepSeek = aiProviderEnv === '' && hasAiProviderKey('deepseek');
 } else {
   console.warn(
     `Unknown AI_PROVIDER="${process.env.AI_PROVIDER}". Falling back to DeepSeek(if set) or OpenAI.`,
   );
-  useDeepSeek = hasAiProviderKey('deepseek') && !gatewayEnabled;
+  useDeepSeek = hasAiProviderKey('deepseek');
 }
 
 // OpenAI/DeepSeek client

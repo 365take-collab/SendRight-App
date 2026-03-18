@@ -105,6 +105,21 @@ describe('AI provider policy', () => {
     expect(ai.AI_MODEL_ID).toBe('deepseek/deepseek-chat');
   });
 
+  it('AI Gateway 利用時も AI_PROVIDER 未指定なら既定で deepseek を優先する', async () => {
+    applyEnv({
+      OPENAI_API_KEY: undefined,
+      DEEPSEEK_API_KEY: undefined,
+      AI_GATEWAY_API_KEY: 'test-gateway',
+      AI_PROVIDER: undefined,
+      ALLOW_ANTHROPIC: undefined,
+      INTERNAL_AUTOMATION: undefined,
+    });
+
+    const ai = await importFreshAi();
+    expect(ai.AI_PROVIDER).toBe('deepseek');
+    expect(ai.AI_MODEL_ID).toBe('deepseek/deepseek-chat');
+  });
+
   it('INTERNAL_AUTOMATION=1 の場合は Claude を禁止する', async () => {
     applyEnv({
       OPENAI_API_KEY: 'test-openai',
