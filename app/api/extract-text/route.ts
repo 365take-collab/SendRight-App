@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, findUserById, checkSubscription, canUseService, incrementUsageCount, getUsageInfo } from '@/lib/auth';
 import { checkRateLimit, detectAnomalousPattern, RATE_LIMIT_MAX_REQUESTS } from '@/lib/security';
+import { getOpenAIClientConfig, hasAiProviderKey, resolveModel } from '@/lib/ai-gateway';
 import OpenAI from 'openai';
 import { z } from 'zod';
+
+const VISION_CONFIG_ERROR =
+  '画像抽出機能を使用するには、OPENAI_API_KEY または AI_GATEWAY_API_KEY の設定が必要です。\n\nAI Gateway を使う場合は GATEWAY_VISION_MODEL で `openai/gpt-4o` などへ切り替えられます。\n\n画像抽出機能を使わない場合は、テキスト入力で返信生成が可能です。';
 
 // 画像抽出用のOpenAI API（Vision APIが必要なため）
 // 返信生成はGroq API（無料）を使用
 // APIキーが設定されている場合のみ初期化
 const getOpenAIClient = () => {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasAiProviderKey('openai')) {
     return null;
   }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  return new OpenAI(getOpenAIClientConfig('vision'));
 };
 
 const extractSchema = z.object({
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
     if (!openai) {
       return NextResponse.json(
         { 
-          error: '画像抽出機能を使用するには、OPENAI_API_KEYの設定が必要です。\n\n画像抽出はOpenAI Vision APIを使用します（返信生成はGroq API（無料）を使用します）。\n\n画像抽出機能を使わない場合は、テキスト入力で返信生成が可能です。',
+          error: VISION_CONFIG_ERROR,
           extractedText: '',
           message: ''
         },
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
     // gpt-4oはより高精度な画像認識が可能
     // 注意: 画像抽出のみOpenAI APIを使用（返信生成はGroq API（無料）を使用）
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: resolveModel('vision', 'gpt-4o'),
       messages: [
         {
           role: 'user',
@@ -520,10 +522,13 @@ LINEやマッチングアプリでは：
     console.error('Extract text error:', error);
     
     // OpenAI APIキーが設定されていない場合のエラー
-    if (error instanceof Error && error.message.includes('OPENAI_API_KEY')) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('OPENAI_API_KEY') || error.message.includes('AI_GATEWAY_API_KEY'))
+    ) {
       return NextResponse.json(
         { 
-          error: '画像抽出機能を使用するには、OPENAI_API_KEYの設定が必要です。\n\n画像抽出はOpenAI Vision APIを使用します（返信生成はGroq API（無料）を使用します）。\n\n画像抽出機能を使わない場合は、テキスト入力で返信生成が可能です。',
+          error: VISION_CONFIG_ERROR,
           extractedText: '',
           message: ''
         },

@@ -9,6 +9,7 @@ async function importFreshAi() {
 
 beforeEach(() => {
   process.env.OPENAI_API_KEY = 'test-openai';
+  delete process.env.AI_GATEWAY_API_KEY;
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 });
@@ -40,5 +41,17 @@ describe('sanitizeGeneratedReply', () => {
     );
 
     expect(reply).toBe('それめっちゃ大変だったね。\n無理しすぎないでね。');
+  });
+
+  it('AI Gateway 利用時は provider 情報に Gateway 経由のモデルIDを含む', async () => {
+    process.env.OPENAI_API_KEY = '';
+    process.env.AI_GATEWAY_API_KEY = 'test-gateway';
+
+    const { getAiProviderInfo } = await importFreshAi();
+    expect(getAiProviderInfo()).toEqual({
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      label: 'OpenAI openai/gpt-4o-mini via Vercel AI Gateway',
+    });
   });
 });

@@ -1,5 +1,12 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import {
+  gatewayEnabled,
+  getAnthropicClientConfig,
+  getOpenAIClientConfig,
+  hasAiProviderKey,
+  resolveModel,
+} from './ai-gateway';
 
 // AI Provider設定
 // 方針:
@@ -26,46 +33,46 @@ if (aiProviderEnv === 'anthropic') {
       'Anthropic(Claude) is disabled by default. Set ALLOW_ANTHROPIC=1 to enable.',
     );
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('AI_PROVIDER=anthropic requires ANTHROPIC_API_KEY.');
+  if (!hasAiProviderKey('anthropic')) {
+    throw new Error('AI_PROVIDER=anthropic requires ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY.');
   }
   useAnthropic = true;
 } else if (aiProviderEnv === 'deepseek') {
-  if (!process.env.DEEPSEEK_API_KEY) {
-    throw new Error('AI_PROVIDER=deepseek requires DEEPSEEK_API_KEY.');
+  if (!hasAiProviderKey('deepseek')) {
+    throw new Error('AI_PROVIDER=deepseek requires DEEPSEEK_API_KEY or AI_GATEWAY_API_KEY.');
   }
   useDeepSeek = true;
 } else if (aiProviderEnv === 'openai' || aiProviderEnv === '') {
   // Default: DeepSeek(if set) -> OpenAI
-  useDeepSeek = aiProviderEnv === '' && !!process.env.DEEPSEEK_API_KEY;
+  useDeepSeek = aiProviderEnv === '' && hasAiProviderKey('deepseek') && !gatewayEnabled;
 } else {
   console.warn(
     `Unknown AI_PROVIDER="${process.env.AI_PROVIDER}". Falling back to DeepSeek(if set) or OpenAI.`,
   );
-  useDeepSeek = !!process.env.DEEPSEEK_API_KEY;
+  useDeepSeek = hasAiProviderKey('deepseek') && !gatewayEnabled;
 }
 
 // OpenAI/DeepSeek client
-const openai = new OpenAI({
-  apiKey: useDeepSeek ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY,
-  baseURL: useDeepSeek ? 'https://api.deepseek.com' : undefined,
-});
+const openai = new OpenAI(getOpenAIClientConfig(useDeepSeek ? 'deepseek' : 'openai'));
 
 // Anthropic client
 const anthropic = useAnthropic ? new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  ...getAnthropicClientConfig(),
 }) : null;
 
 // 使用するモデル
 // Claude: claude-3-5-haiku-20241022 (高速・安価・デフォルト) or claude-3-5-sonnet-20241022 (高品質)
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
-const AI_MODEL = useDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini';
+const CLAUDE_MODEL = resolveModel(
+  'anthropic',
+  process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022',
+);
+const AI_MODEL = resolveModel(useDeepSeek ? 'deepseek' : 'openai', useDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini');
 
 const providerName = useAnthropic 
-  ? `Anthropic ${CLAUDE_MODEL}` 
+  ? `Anthropic ${CLAUDE_MODEL}${gatewayEnabled ? ' via Vercel AI Gateway' : ''}` 
   : useDeepSeek 
-    ? 'DeepSeek V3' 
-    : 'OpenAI GPT-4o-mini';
+    ? `DeepSeek ${AI_MODEL}${gatewayEnabled ? ' via Vercel AI Gateway' : ''}` 
+    : `OpenAI ${AI_MODEL}${gatewayEnabled ? ' via Vercel AI Gateway' : ''}`;
 
 console.log(`AI Provider: ${providerName}`);
 

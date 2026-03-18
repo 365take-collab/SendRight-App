@@ -75,10 +75,41 @@ describe('AI provider policy', () => {
     expect(ai.AI_PROVIDER).toBe('anthropic');
   });
 
+  it('AI Gateway 利用時は ANTHROPIC_API_KEY なしでも anthropic を選べる', async () => {
+    applyEnv({
+      OPENAI_API_KEY: undefined,
+      ANTHROPIC_API_KEY: undefined,
+      AI_GATEWAY_API_KEY: 'test-gateway',
+      AI_PROVIDER: 'anthropic',
+      ALLOW_ANTHROPIC: '1',
+      INTERNAL_AUTOMATION: undefined,
+    });
+
+    const ai = await importFreshAi();
+    expect(ai.AI_PROVIDER).toBe('anthropic');
+    expect(ai.AI_MODEL_ID).toBe('anthropic/claude-3-5-haiku-20241022');
+  });
+
+  it('AI Gateway 利用時は DEEPSEEK_API_KEY なしでも deepseek を選べる', async () => {
+    applyEnv({
+      OPENAI_API_KEY: undefined,
+      DEEPSEEK_API_KEY: undefined,
+      AI_GATEWAY_API_KEY: 'test-gateway',
+      AI_PROVIDER: 'deepseek',
+      ALLOW_ANTHROPIC: undefined,
+      INTERNAL_AUTOMATION: undefined,
+    });
+
+    const ai = await importFreshAi();
+    expect(ai.AI_PROVIDER).toBe('deepseek');
+    expect(ai.AI_MODEL_ID).toBe('deepseek/deepseek-chat');
+  });
+
   it('INTERNAL_AUTOMATION=1 の場合は Claude を禁止する', async () => {
     applyEnv({
       OPENAI_API_KEY: 'test-openai',
       ANTHROPIC_API_KEY: 'test-anthropic',
+      AI_GATEWAY_API_KEY: undefined,
       AI_PROVIDER: 'anthropic',
       ALLOW_ANTHROPIC: '1',
       INTERNAL_AUTOMATION: '1',
