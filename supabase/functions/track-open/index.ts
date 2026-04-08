@@ -16,7 +16,7 @@ serve(async (request) => {
   const id = url.searchParams.get('id');
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return new Response('missing id', { status: 400 });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -30,14 +30,24 @@ serve(async (request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('email_send_log')
-    .update({ opened_at: new Date().toISOString() })
+    .select('id, opened_at')
     .eq('id', id)
-    .is('opened_at', null);
+    .maybeSingle();
 
   if (error) {
-    console.error('track-open update failed', error);
+    console.error('track-open select failed', error);
+  } else if (data?.opened_at == null) {
+    const { error: updateError } = await supabase
+      .from('email_send_log')
+      .update({ opened_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('opened_at', null);
+
+    if (updateError) {
+      console.error('track-open update failed', updateError);
+    }
   }
 
   return new Response(gif, {
