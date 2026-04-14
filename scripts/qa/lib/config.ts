@@ -14,7 +14,7 @@ export interface EndpointConfig {
 export const QA_CONFIG = {
   baseUrl: process.env.QA_BASE_URL || 'https://app.sendright.jp',
   testUser: {
-    email: process.env.QA_TEST_EMAIL || 'master-test@launchx.jp',
+    email: process.env.QA_TEST_EMAIL || 'qa-test@sendright.jp',
     password: process.env.QA_TEST_PASSWORD || '',
   },
   slack: {

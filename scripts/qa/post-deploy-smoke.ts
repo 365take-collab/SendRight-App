@@ -9,7 +9,7 @@ import { config } from 'dotenv';
 config({ path: new URL('../../.env.local', import.meta.url).pathname });
 
 const BASE_URL = process.env.QA_BASE_URL || 'https://app.sendright.jp';
-const TEST_EMAIL = process.env.QA_TEST_EMAIL || 'master-test@launchx.jp';
+const TEST_EMAIL = process.env.QA_TEST_EMAIL || 'qa-test@sendright.jp';
 const TEST_PASSWORD = process.env.QA_TEST_PASSWORD || '';
 const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK_URL_BUGS || '';
 

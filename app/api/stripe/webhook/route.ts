@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireStripe } from '@/lib/stripe';
 import { findUserByEmail, createUser, generateInitialPassword } from '@/lib/auth';
 import { updateUser, grantReferralReward, recordStripeWebhookEvent, markStripeWebhookEventProcessed, markStripeWebhookEventFailed } from '@/lib/supabase';
-import { sendWelcomeEmail } from '@/lib/resend';
+import { sendCancellationEmail, sendWelcomeEmail } from '@/lib/resend';
 import { notifyError } from '@/lib/slack';
 import Stripe from 'stripe';
 
@@ -230,12 +230,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     is_subscribed: false,
   });
 
-  // TODO: Resend準備完了後に解約メール送信を有効化
-  // try {
-  //   await sendCancellationEmail(customer.email);
-  // } catch (error) {
-  //   console.error('Failed to send cancellation email:', error);
-  // }
+  await sendCancellationEmail(customer.email);
 
   console.log('Subscription deleted:', {
     email: customer.email,

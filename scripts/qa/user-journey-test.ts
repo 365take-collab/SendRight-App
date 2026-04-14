@@ -9,7 +9,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.QA_TEST_EMAIL || 'master-test@launchx.jp';
+const TEST_EMAIL = process.env.QA_TEST_EMAIL || 'qa-test@sendright.jp';
 const TEST_PASSWORD = process.env.QA_TEST_PASSWORD || '';
 
 test.describe('SendRight ユーザージャーニー', () => {

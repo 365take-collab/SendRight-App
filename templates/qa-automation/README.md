@@ -58,7 +58,7 @@ QA_TEST_EMAIL=            # テストユーザーのメール（省略時はconf
 LaunchAgentsにplistを配置して15分おき実行:
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.launchx.PROJECT-health-check.plist
+launchctl load ~/Library/LaunchAgents/com.sendright.PROJECT-health-check.plist
 ```
 
 ## ファイル分類

@@ -12,6 +12,20 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://sendright.jp';
 type StandardStepEmailType = 'welcome' | 'day1' | 'day3' | 'day7' | 'day14' | 'day30';
 export type StepEmailType = StandardStepEmailType | keyof typeof AOPUA_TEMPLATES;
 
+function getResendClient(options?: { throwOnMissing?: boolean }): Resend | null {
+  if (resend && process.env.RESEND_API_KEY) {
+    return resend;
+  }
+
+  const message = 'RESEND_API_KEY is not set';
+  if (options?.throwOnMissing) {
+    throw new Error(message);
+  }
+
+  console.warn(`${message}, skipping email send`);
+  return null;
+}
+
 function buildFromEmail(fromName?: string): string {
   if (!fromName) return FROM_EMAIL;
   const match = FROM_EMAIL.match(/<([^>]+)>/);
@@ -25,15 +39,15 @@ export async function sendWelcomeEmail(
   plan: 'monthly' | 'yearly',
   initialPassword?: string
 ) {
-  if (!resend || !process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set, skipping email send');
+  const resendClient = getResendClient();
+  if (!resendClient) {
     return;
   }
 
   const planName = plan === 'monthly' ? '月額プラン' : '年額プラン';
   
   try {
-    await resend.emails.send({
+    await resendClient.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'SendRightへようこそ！',
@@ -97,8 +111,8 @@ export async function sendStepEmail(
   email: string,
   emailType: StepEmailType
 ) {
-  if (!resend || !process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set, skipping email send');
+  const resendClient = getResendClient();
+  if (!resendClient) {
     return;
   }
 
@@ -223,7 +237,7 @@ export async function sendStepEmail(
   }
 
   try {
-    await resend.emails.send({
+    await resendClient.emails.send({
       from,
       to: email,
       subject,
@@ -243,15 +257,15 @@ export async function sendReferralBonusEmail(
   threshold: number,
   bonusName: string
 ) {
-  if (!resend || !process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set, skipping referral bonus email');
+  const resendClient = getResendClient();
+  if (!resendClient) {
     return;
   }
 
   const subject = `紹介${threshold}人達成！特典「${bonusName}」のご案内`;
 
   try {
-    await resend.emails.send({
+    await resendClient.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject,
@@ -285,13 +299,10 @@ export async function sendReferralBonusEmail(
 
 // 解約メール送信
 export async function sendCancellationEmail(email: string) {
-  if (!resend || !process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set, skipping email send');
-    return;
-  }
+  const resendClient = getResendClient({ throwOnMissing: true });
 
   try {
-    await resend.emails.send({
+    await resendClient.emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'SendRightのサブスクリプション解約について',
